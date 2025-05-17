@@ -18,7 +18,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-
+extern BOOLEAN gSuppressPointerDraw;
 #ifndef __REFINDPLUS_POINTERDEVICE_H_
 #define __REFINDPLUS_POINTERDEVICE_H_
 

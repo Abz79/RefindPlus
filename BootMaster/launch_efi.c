@@ -1139,11 +1139,6 @@ VOID StartTool (
     CHAR16     *MsgStr;
     CHAR16     *LoaderPath;
 
-    #if REFIT_DEBUG > 0
-    BOOLEAN CheckMute = FALSE;
-    #endif
-
-
     IsBoot     = FALSE;
     LoaderPath = Basename (Entry->LoaderPath);
     MsgStr     = PoolPrint (
@@ -1151,47 +1146,20 @@ VOID StartTool (
         Entry->LoaderPath
     );
 
-    #if REFIT_DEBUG > 0
-    ALT_LOG(1, LOG_LINE_NORMAL, L"%s", MsgStr);
-    #endif
-
     BeginExternalScreen (Entry->UseGraphicsMode, MsgStr);
 
-    #if REFIT_DEBUG > 0
-    LOG_MSG("%s    * %s", OffsetNext, MsgStr);
-    LOG_MSG("\n");
-    #endif
-
     if (FindSubStr (Entry->me.Title, L"APFS Instance")) {
-        /* APFS Recovery Instance */
         Status = RecoveryBootAPFS (Entry);
         if (EFI_ERROR(Status)) {
-            MY_FREE_POOL(MsgStr);
-            MsgStr = PoolPrint (
-                L"'%r' While Running '%s'",
-                Status, Entry->me.Title
-            );
-
-            #if REFIT_DEBUG > 0
-            ALT_LOG(1, LOG_LINE_NORMAL, L"%s", MsgStr);
-            LOG_MSG("** WARN: %s", MsgStr);
-            LOG_MSG("\n\n");
-
-            MY_MUTELOGGER_SET;
-            #endif
+            // Just log, no message pause
             REFIT_CALL_2_WRAPPER(gST->ConOut->SetAttribute, gST->ConOut, ATTR_ERROR);
             PrintUglyText (MsgStr, NEXTLINE);
             REFIT_CALL_2_WRAPPER(gST->ConOut->SetAttribute, gST->ConOut, ATTR_BASIC);
-            #if REFIT_DEBUG > 0
-            MY_MUTELOGGER_OFF;
-            #endif
-
-            PauseForKey();
-
-            MY_FREE_POOL(MsgStr);
+            // Skipping PauseForKey() to avoid waiting
         }
-
-        // Early Return
+        // Return regardless
+        MY_FREE_POOL(MsgStr);
+        MY_FREE_POOL(LoaderPath);
         return;
     }
 
@@ -1207,4 +1175,4 @@ VOID StartTool (
 
     MY_FREE_POOL(MsgStr);
     MY_FREE_POOL(LoaderPath);
-} // VOID StartTool()
+}

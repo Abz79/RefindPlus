@@ -1,3 +1,4 @@
+//with adjustments 
 /*
  * BootMaster/pointer.c
  * Pointer device functions
@@ -24,34 +25,31 @@
  *
  * Modifications distributed under the preceding terms.
  */
-
+//
 #include "global.h"
 #include "pointer.h"
 #include "screenmgt.h"
 #include "rp_funcs.h"
 #include "icns.h"
 #include "../include/refit_call_wrapper.h"
+// In pointer.c, near other global variables
+BOOLEAN gSuppressPointerDraw = FALSE;
 
 UINTN                           NumSPointerDevices =                                  0;
 EFI_GUID                        SPointerGuid       =   EFI_SIMPLE_POINTER_PROTOCOL_GUID;
 EFI_HANDLE                     *HandleS            =                               NULL;
 EFI_SIMPLE_POINTER_PROTOCOL   **ProtocolS          =                               NULL;
-
 UINTN                           NumAPointerDevices =                                  0;
 EFI_GUID                        APointerGuid       = EFI_ABSOLUTE_POINTER_PROTOCOL_GUID;
 EFI_HANDLE                     *HandleA            =                               NULL;
 EFI_ABSOLUTE_POINTER_PROTOCOL **ProtocolA          =                               NULL;
-
 UINTN                           LastXPos           =                                  0;
 UINTN                           LastYPos           =                                  0;
 EG_IMAGE                       *MouseImage         =                               NULL;
 EG_IMAGE                       *Background         =                               NULL;
-
 BOOLEAN                         MouseTouchActive   =                               TRUE;
 BOOLEAN                         PointerAvailable   =                              FALSE;
 POINTER_STATE                   State;
-
-
 ////////////////////////////////////////////////////////////////////////////////
 // Initialise Pointer Devices
 ////////////////////////////////////////////////////////////////////////////////
@@ -89,7 +87,6 @@ VOID pdInitialize (VOID) {
 
     if (!GlobalConfig.EnableMouse && !GlobalConfig.EnableTouch) {
         MouseTouchActive = FALSE;
-
         #if REFIT_DEBUG > 0
         // DA-TAG: Use LOG_THREE_STAR_END for this instance
         MsgStr = StrDuplicate (L"Running in 'Keyboard Only' Mode");
@@ -150,7 +147,6 @@ VOID pdInitialize (VOID) {
                     );
                     if (!EFI_ERROR(Status)) {
                         NumAPointerDevices++;
-
                         #if REFIT_DEBUG > 0
                         EnableStatusTouch = EFI_SUCCESS;
                         #endif
@@ -168,7 +164,6 @@ VOID pdInitialize (VOID) {
     ALT_LOG(1, LOG_THREE_STAR_MID, L"%s", MsgStr);
     LOG_MSG("%s  - %s", OffsetNext, MsgStr);
     MY_FREE_POOL(MsgStr);
-
     // Get handles that support the simple pointer protocol (mice)
     EnableStatusMouse = EFI_NOT_STARTED;
     #endif
@@ -180,7 +175,6 @@ VOID pdInitialize (VOID) {
             &SPointerGuid, NULL,
             &NumPointerHandles, &HandleS
         );
-
         if (EFI_ERROR(HandleStatus)) {
             #if REFIT_DEBUG > 0
             EnableStatusMouse = EFI_LOAD_ERROR;
@@ -207,14 +201,12 @@ VOID pdInitialize (VOID) {
                     );
                     if (!EFI_ERROR(Status)) {
                         Counter = 1;
-
                         #if REFIT_DEBUG > 0
                         EnableStatusMouse = EFI_SUCCESS;
                         #endif
                     }
                     else {
                         Counter = 0;
-
                         #if REFIT_DEBUG > 0
                         if (Status != EFI_NOT_FOUND &&
                             EFI_ERROR(EnableStatusMouse)
@@ -241,7 +233,8 @@ VOID pdInitialize (VOID) {
     #endif
 
     // Load mouse icon
-    PointerAvailable = ((NumAPointerDevices + NumSPointerDevices) > 0) ? TRUE : FALSE;
+    PointerAvailable = ((NumAPointerDevices + NumSPointerDevices) > 0) ?
+    TRUE : FALSE;
     if (!PointerAvailable || !GlobalConfig.EnableMouse) {
         MouseTouchActive = FALSE;
     }
@@ -272,7 +265,6 @@ VOID pdInitialize (VOID) {
 ////////////////////////////////////////////////////////////////////////////////
 VOID pdCleanup (VOID) {
     UINTN Index;
-
     #if REFIT_DEBUG > 0
     CHAR16 *MsgStr;
 
@@ -312,7 +304,6 @@ VOID pdCleanup (VOID) {
     State.Y  = ScreenH / 2;
     State.Press    = FALSE;
     State.Holding  = FALSE;
-
     #if REFIT_DEBUG > 0
     MsgStr = L"Disable Pointer Protocols ... Success";
     ALT_LOG(1, LOG_THREE_STAR_MID, L"%s", MsgStr);
@@ -347,8 +338,6 @@ EFI_EVENT pdWaitEvent (
     UINTN Index
 ) {
     EFI_EVENT TheEvent;
-
-
     if (!PointerAvailable                              ||
         Index >= (NumAPointerDevices + NumSPointerDevices)
     ) {
@@ -395,6 +384,13 @@ EFI_STATUS pdUpdateState (VOID) {
                 ProtocolA[Index]->GetState, ProtocolA[Index], &APointerState
             );
             if (!EFI_ERROR(PointerStatus)) {
+                // --- Added Debug Log ---
+                #if REFIT_DEBUG > 1 // Use loglevel2 for this detailed info
+                LOG_MSG("APointer Input: CurrentX=%d, CurrentY=%d, ActiveButtons=%x\n",
+                        APointerState.CurrentX, APointerState.CurrentY, APointerState.ActiveButtons);
+                #endif
+                // --- End Debug Log ---
+
 #ifndef EFI32
                 State.X = (APointerState.CurrentX * ScreenW) / ProtocolA[Index]->Mode->AbsoluteMaxX;
                 State.Y = (APointerState.CurrentY * ScreenH) / ProtocolA[Index]->Mode->AbsoluteMaxY;
@@ -410,6 +406,11 @@ EFI_STATUS pdUpdateState (VOID) {
                     NULL
                 );
 #endif
+                // --- Added Debug Log ---
+                #if REFIT_DEBUG > 1 // Use loglevel2
+                LOG_MSG("APointer State Updated: X=%d, Y=%d\n", State.X, State.Y);
+                #endif
+                // --- End Debug Log ---
 
                 State.Holding = (APointerState.ActiveButtons & EFI_ABSP_TouchActive);
                 Status = EFI_SUCCESS;
@@ -427,6 +428,13 @@ EFI_STATUS pdUpdateState (VOID) {
                 ProtocolS[Index]->GetState, ProtocolS[Index], &SPointerState
             );
             if (!EFI_ERROR(PointerStatus)) {
+                // --- Added Debug Log ---
+                #if REFIT_DEBUG > 1 // Use loglevel2
+                LOG_MSG("SPointer Input: RelativeMovementX=%d, RelativeMovementY=%d, LeftButton=%d\n",
+                        SPointerState.RelativeMovementX, SPointerState.RelativeMovementY, SPointerState.LeftButton);
+                #endif
+                // --- End Debug Log ---
+
 #ifndef EFI32
                 TargetX = State.X + SPointerState.RelativeMovementX *
                     GlobalConfig.MouseSpeed / ProtocolS[Index]->Mode->ResolutionX;
@@ -445,6 +453,41 @@ EFI_STATUS pdUpdateState (VOID) {
                 );
 #endif
 
+                // --- Potential Adjustment 1: Sensitivity check ---
+                // Add a check to see if movement is significant enough before updating
+                // This can sometimes help with jitter or minor spurious input
+                /*
+                #define MIN_MOVEMENT_THRESHOLD 2 // Adjust this value as needed
+                if (ABS(SPointerState.RelativeMovementX) < MIN_MOVEMENT_THRESHOLD &&
+                    ABS(SPointerState.RelativeMovementY) < MIN_MOVEMENT_THRESHOLD) {
+                    // Movement is too small, ignore this update for position
+                } else {
+                    // Original boundary checks and State update
+                    if (TargetX < 0) {
+                        State.X = 0;
+                    }
+                    else if (TargetX >= ScreenW) {
+                        State.X = ScreenW - 1;
+                    }
+                    else {
+                        State.X = TargetX;
+                    }
+
+                    if (TargetY < 0) {
+                        State.Y = 0;
+                    }
+                    else if (TargetY >= ScreenH) {
+                        State.Y = ScreenH - 1;
+                    }
+                    else {
+                        State.Y = TargetY;
+                    }
+                }
+                */
+                // --- End Potential Adjustment 1 ---
+
+
+                // Original boundary checks and State update (if not using Adjustment 1)
                 if (TargetX < 0) {
                     State.X = 0;
                 }
@@ -465,6 +508,13 @@ EFI_STATUS pdUpdateState (VOID) {
                     State.Y = TargetY;
                 }
 
+                // --- Added Debug Log ---
+                #if REFIT_DEBUG > 1 // Use loglevel2
+                LOG_MSG("SPointer State Updated: X=%d, Y=%d\n", State.X, State.Y);
+                #endif
+                // --- End Debug Log ---
+
+
                 State.Holding = SPointerState.LeftButton;
                 Status = EFI_SUCCESS;
 
@@ -474,6 +524,14 @@ EFI_STATUS pdUpdateState (VOID) {
     } while (0); // This 'loop' only runs once
 
     State.Press = (LastHolding && !State.Holding);
+
+    // --- Added Debug Log ---
+    #if REFIT_DEBUG > 1 // Use loglevel2
+    LOG_MSG("pdUpdateState End: State.X=%d, State.Y=%d, State.Press=%d, State.Holding=%d\n",
+            State.X, State.Y, State.Press, State.Holding);
+    #endif
+    // --- End Debug Log ---
+
 
     return Status;
 } // EFI_STATUS pdUpdateState()
@@ -496,7 +554,30 @@ VOID pdDraw (VOID) {
         return;
     }
 
-    MY_FREE_IMAGE(Background);
+    // --- Added Debug Log ---
+    #if REFIT_DEBUG > 1 // Use loglevel2
+    LOG_MSG("pdDraw: Drawing at X=%d, Y=%d\n", State.X, State.Y);
+    #endif
+    // --- End Debug Log ---
+    // Add this check at the beginning
+    if (gSuppressPointerDraw) {
+        return; // Exit without drawing the pointer if suppressed
+    }
+    if (!MouseTouchActive) {
+        return;
+    }
+    // --- Potential Adjustment 2: Redraw optimization check ---
+    // Only redraw if the position has actually changed
+
+//    if (State.X == LastXPos && State.Y == LastYPos && Background != NULL) {
+         // Position hasn't changed and background is already cleared, no need to redraw
+ //        return;
+ //   }
+
+    // --- End Potential Adjustment 2 ---
+
+    pdClear(); // Clear the previous position
+
     if (MouseImage != NULL) {
         Width  = ((State.X + MouseImage->Width)  > ScreenW)
             ? ScreenW - State.X : MouseImage->Width;
@@ -524,9 +605,14 @@ VOID pdDraw (VOID) {
 VOID pdClear (VOID) {
     #if REFIT_DEBUG > 0
     CHAR16 *MsgStr;
-
     static BOOLEAN NotLogged = TRUE;
     #endif
+
+    // --- Added Debug Log ---
+    #if REFIT_DEBUG > 1 // Use loglevel2
+    LOG_MSG("pdClear: Clearing at LastXPos=%d, LastYPos=%d\n", LastXPos, LastYPos);
+    #endif
+    // --- End Debug Log ---
 
 
     if (!MouseTouchActive) {

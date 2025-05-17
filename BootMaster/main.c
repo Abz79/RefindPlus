@@ -2778,11 +2778,11 @@ VOID ResetCall (
     #endif
 
 
-    egDisplayMessage (
+ /*   egDisplayMessage (
         TypeStr, &BGColorBase,
-        CENTER, 3, L"PauseSeconds"
+        CENTER, 0, L"PauseSeconds"
     );
-
+*/
     #if REFIT_DEBUG > 0
     MsgStr = (IsRestart)
         ? StrDuplicate (L"R U N   S Y S T E M   R E S T A R T")
@@ -2796,7 +2796,6 @@ VOID ResetCall (
     LOG_MSG("Run %s", TypeStr);
     END_TAG();
     #endif
-
     // Terminate Screen
     TerminateScreen();
 

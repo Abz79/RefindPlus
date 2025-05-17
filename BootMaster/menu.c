@@ -46,7 +46,7 @@
  *
  * Modifications distributed under the preceding terms.
  */
-
+#include "pointer.h"
 #include "global.h"
 #include "menu.h"
 #include "icns.h"
@@ -79,6 +79,7 @@
 static CHAR16 ArrowUp[2]   = {ARROW_UP, 0};
 static CHAR16 ArrowDown[2] = {ARROW_DOWN, 0};
 static UINTN  TileSizes[2] = {144, 64};
+extern BOOLEAN gSuppressPointerDraw;
 
 // Text and icon spacing constants.
 #define TEXT_YMARGIN                  (2)
@@ -851,52 +852,60 @@ CHAR16 * GetScanCodeText (
     return Retval;
 } // static CHAR16 * GetScanCodeText()
 #endif
+// DrawMenuScreen()
+// Add these flags at the beginning of the DrawMenuScreen function,
+// perhaps near other variable declarations.
+// NOTE: DeferPointerDraw variable is REMOVED.
+UINT64 NextTimeoutUpdateTime = 0;      // Scheduled time for the next timeout countdown update
+UINT64 NextScreensaverUpdateTime = 0; // Scheduled time for the next screensaver timer update
+
 
 UINTN DrawMenuScreen (
-    IN     REFIT_MENU_SCREEN   *Screen,
-    IN     MENU_STYLE_FUNC      StyleFunc,
-    IN OUT INTN                *DefaultEntryIndex,
-    OUT    REFIT_MENU_ENTRY  **ChosenOption
-) {
-    EFI_STATUS                  Status;
-    EFI_STATUS                  PointerStatus;
-    BOOLEAN                     Rotated;
-    BOOLEAN                     IsMainMenu;
-    BOOLEAN                     HaveTimeout;
-    BOOLEAN                     UserKeyScan;
-    BOOLEAN                     UserKeyPress;
-    BOOLEAN                     WaitForRelease;
-    INTN                        TimeoutCountdown;
-    INTN                        TimeSinceKeystroke;
-    INTN                        PreviousTime;
-    INTN                        CurrentTime;
-    INTN                        ShortcutEntry;
-    UINTN                       ElapsCount;
-    UINTN                       Input;
-    UINTN                       Item;
-    UINTN                       MenuExit;
-    UINT64                      MenuExitNumb;
-    UINT64                      MenuExitGate;
-    UINT64                      MenuExitTime;
-    UINT64                      MenuExitDiff;
-    CHAR16                     *TimeoutMessage;
-    CHAR16                      KeyAsString[2];
-    SCROLL_STATE                State;
-    EFI_INPUT_KEY               key;
-
-    #if REFIT_DEBUG > 0
-    CHAR16                     *MsgStr;
-    CHAR16                     *KeyTxt;
-    BOOLEAN                     TmpLevel;
-    BOOLEAN                     CheckMute = FALSE;
-
-    static BOOLEAN              OnceWait = FALSE;
-    #endif
-
-
+                      IN     REFIT_MENU_SCREEN   *Screen,
+                      IN     MENU_STYLE_FUNC      StyleFunc,
+                      IN OUT INTN                 *DefaultEntryIndex,
+                      OUT    REFIT_MENU_ENTRY   **ChosenOption
+                      )
+{
+    EFI_STATUS                 Status;
+    EFI_STATUS                 PointerStatus;
+    BOOLEAN                    Rotated;
+    BOOLEAN                    IsMainMenu;
+    BOOLEAN                    HaveTimeout;
+    BOOLEAN                    UserKeyScan;
+    BOOLEAN                    UserKeyPress;
+    BOOLEAN                    WaitForRelease;
+    INTN                       TimeoutCountdown;
+    INTN                       TimeSinceKeystroke;
+    INTN                       PreviousTime;
+    INTN                       CurrentTime;
+    INTN                       ShortcutEntry;
+    UINTN                      Item;
+    UINTN                      MenuExit;
+    UINT64                     MenuExitNumb;
+    UINT64                     MenuExitGate;
+    UINT64                     MenuExitTime;
+    UINT64                     MenuExitDiff;
+    CHAR16                    *TimeoutMessage;
+    CHAR16                     KeyAsString[2];
+    SCROLL_STATE               State;
+    EFI_INPUT_KEY              key;
+    POINTER_STATE              CurrentPointerState = {0};
+    BOOLEAN                    PreviousPointerPressed = FALSE;
+    
+    
+#if REFIT_DEBUG > 0
+    CHAR16                    *MsgStr;
+    CHAR16                    *KeyTxt;
+    BOOLEAN                    TmpLevel;
+    BOOLEAN                    CheckMute = FALSE;
+    static BOOLEAN             OnceWait = FALSE;
+#endif
+    
+    
     IsMainMenu = MyStriCmp (Screen->Title, MAIN_MENU_NAME);
-
-    #if REFIT_DEBUG > 0
+    
+#if REFIT_DEBUG > 0
     if (OnceWait || !IsMainMenu) {
         if (!IsMainMenu) {
             ALT_LOG(1, LOG_LINE_THIN_SEP, L"Draw Menu Screen");
@@ -906,67 +915,67 @@ UINTN DrawMenuScreen (
         }
         ALT_LOG(1, LOG_LINE_NORMAL, L"Screen Title:- '%s'", Screen->Title);
     }
-
+    
     LOG_SEP(L"X");
     LOG_INCREMENT();
     BREAD_CRUMB(L"%a:  1 - START", __func__);
-    #endif
-
+#endif
+    
     if (Screen->TimeoutSeconds < 1) {
         HaveTimeout = FALSE;
         TimeoutCountdown = 0;
     }
     else {
         HaveTimeout = TRUE;
-        TimeoutCountdown = Screen->TimeoutSeconds * 10;
+        TimeoutCountdown = Screen->TimeoutSeconds * 10; // Timeout in 1/10 seconds
     }
-
+    
     StyleFunc (Screen, &State, MENU_FUNCTION_INIT, NULL);
     IdentifyRows (&State, Screen);
-
     // Override the starting selection with the default index, if any
     if (*DefaultEntryIndex == 9999) {
         *DefaultEntryIndex = State.MaxIndex;
     }
-
-    if (*DefaultEntryIndex >= 0           &&
+    
+    if (*DefaultEntryIndex >= 0          &&
         *DefaultEntryIndex <= State.MaxIndex
-    ) {
+        ) {
         State.CurrentSelection = *DefaultEntryIndex;
-        if (GlobalConfig.ScreensaverTime != -1) {
-            UpdateScroll (&State, SCROLL_NONE);
-        }
+        // Always update scroll state initially for correct positioning
+        UpdateScroll(&State, SCROLL_NONE);
     }
-
+    
     WaitForRelease = FALSE;
-    MenuExit = MENU_EXIT_ZERO; // Temporary in case we need to abort DirectBoot
-
+    MenuExit = MENU_EXIT_ZERO;
+    // Temporary in case we need to abort DirectBoot
+    
     if (Screen->TimeoutSeconds == -1) {
         Status = REFIT_CALL_2_WRAPPER(gST->ConIn->ReadKeyStroke, gST->ConIn, &key);
         if (!EFI_ERROR(Status)) {
             KeyAsString[0] = key.UnicodeChar;
             KeyAsString[1] = 0;
-
             ShortcutEntry = FindMenuShortcutEntry (Screen, KeyAsString);
             if (ShortcutEntry >= 0) {
                 State.CurrentSelection = ShortcutEntry;
+                // Update scroll state for the initial selection based on shortcut
+                UpdateScroll(&State, SCROLL_NONE);
             }
             else {
-                WaitForRelease =  TRUE;
+                WaitForRelease =   TRUE;
                 HaveTimeout    = FALSE;
             }
         }
     }
-
+    
     if (!WaitForRelease) {
         // Quietly clear the keystroke buffer just in case
-        #if REFIT_DEBUG > 0
+#if REFIT_DEBUG > 0
         MY_MUTELOGGER_SET;
-        #endif
+#endif
         REFIT_CALL_2_WRAPPER(gST->ConIn->Reset, gST->ConIn, FALSE);
-        #if REFIT_DEBUG > 0
+#if REFIT_DEBUG > 0
         MY_MUTELOGGER_OFF;
-        #endif
+#endif
     }
     else {
         if (GlobalConfig.DirectBoot) {
@@ -977,13 +986,13 @@ UINTN DrawMenuScreen (
             //         Also disable Timeout just in case.
             BlockRescan = FALSE;
             Screen->TimeoutSeconds = 0;
-
+            
             // Flag Abort DirectBoot
             MenuExit = MENU_EXIT_SHOWSCREEN;
         }
-
+        
         while (WaitForRelease) {
-            // Esure no keys are being held down
+            // Ensure no keys are being held down
             Status = REFIT_CALL_2_WRAPPER(gST->ConIn->ReadKeyStroke, gST->ConIn, &key);
             if (!EFI_ERROR(Status)) {
                 // Reset to keep the keystroke buffer clear
@@ -995,7 +1004,7 @@ UINTN DrawMenuScreen (
             }
         } // while
     }
-
+    
     if (GlobalConfig.DirectBoot) {
         // DA-TAG: DirectBoot is active.
         //         Either abort or proceed.
@@ -1007,518 +1016,540 @@ UINTN DrawMenuScreen (
     else {
         if (!AllowGraphicsMode &&
             (
-                IsMainMenu ||
-                MyStrBegins (L"Confirm System", Screen->Title)
-            )
-        ) {
+             IsMainMenu ||
+             MyStrBegins (L"Confirm System", Screen->Title)
+             )
+            ) {
+            
             PrepareBlankLine();
             DrawScreenHeader (Screen->Title);
         }
-
-        if (GlobalConfig.ScreensaverTime != -1) {
-            State.PaintAll = TRUE;
-        }
+        
+        // Ensure a full repaint happens on the first loop iteration
+        State.PaintAll = TRUE;
     }
-
-    #if REFIT_DEBUG > 0
+    
+#if REFIT_DEBUG > 0
     if (!OnceWait && IsMainMenu) {
         OnceWait = TRUE;
-
-        MsgStr = PoolPrint (
-            L"Loaded RefindPlus %s on %s Firmware",
-            REFINDPLUS_VERSION, VendorInfo
-        );
-        TmpLevel = (GlobalConfig.LogLevel == 0) ? TRUE : FALSE;
-        if (TmpLevel) {
-            GlobalConfig.LogLevel = 1;
-        }
-        else {
-            ALT_LOG(1, LOG_BLANK_LINE_SEP, L"X");
-        }
-        ALT_LOG(1, LOG_STAR_SEPARATOR, L"%s", MsgStr);
-        ALT_LOG(1, LOG_BLANK_LINE_SEP, L"X");
-        if (TmpLevel) {
-            ALT_LOG(1, LOG_BLANK_LINE_SEP, L"X");
-            GlobalConfig.LogLevel = 0;
-        }
-        MY_FREE_POOL(MsgStr);
-
-        if (GlobalConfig.DirectBoot) {
-            MsgStr = StrDuplicate (L"E X E C U T E   D I R E C T   B O O T");
-        }
-        else {
-            MsgStr = StrDuplicate (L"P R O C E S S   U S E R   I N P U T");
-        }
+        
+        BREAD_CRUMB(L"%a:  3a 1", __func__);
+        MsgStr = StrDuplicate (
+                               L"C O M P L E T E  B O O T S T R A P  S E Q U E N C E"
+                               );
         ALT_LOG(1, LOG_LINE_SEPARATOR, L"%s", MsgStr);
         LOG_MSG("%s", MsgStr);
-        LOG_MSG("\n");
         MY_FREE_POOL(MsgStr);
-
+        
+        BREAD_CRUMB(L"%a:  3a 2", __func__);
+        MsgStr = (*DefaultEntryIndex != -1)
+        ? PoolPrint (L"Configured Default Loader Index:- '%d'", *DefaultEntryIndex)
+        : StrDuplicate (L"Configured Default Loader Index:- 'NULL'");
+        ALT_LOG(1, LOG_LINE_NORMAL, L"%s", MsgStr);
+        LOG_MSG("\n");
+        LOG_MSG("%s", MsgStr);
+        MY_FREE_POOL(MsgStr);
+        
+        
         if (!GlobalConfig.DirectBoot) {
-            TmpLevel = (GlobalConfig.LogLevel == 0) ? TRUE : FALSE;
-            if (TmpLevel) {
-                GlobalConfig.LogLevel = 1;
-            }
-            ALT_LOG(1, LOG_LINE_NORMAL, L"** Awaiting User Input **");
+            BREAD_CRUMB(L"%a:  3a 3a 1", __func__);
+            UINTN EntryPosition = (State.CurrentSelection < 0) ? 0 : State.CurrentSelection;
+            MsgStr = PoolPrint (
+                                L"Highlighted Screen Option:- '%s'",
+                                Screen->Entries[EntryPosition]->Title
+                                );
+            ALT_LOG(1, LOG_LINE_NORMAL, L"%s", MsgStr);
             ALT_LOG(1, LOG_BLANK_LINE_SEP, L"X");
-            if (TmpLevel) {
-                GlobalConfig.LogLevel = 0;
-            }
+            LOG_MSG("\n");
+            LOG_MSG("%s", MsgStr);
+            MY_FREE_POOL(MsgStr);
         }
+        BREAD_CRUMB(L"%a:  3a 4", __func__);
+        LOG_MSG("\n\n");
     }
-    #endif
-
-    PreviousTime                         =    -1;
-    TimeSinceKeystroke                   =     0;
+#endif
+    
+    
+    PreviousTime                                   =   -1;
+    TimeSinceKeystroke                             =    0; // Screensaver timer in 1/10 seconds
     UserKeyPress = UserKeyScan = Rotated = FALSE;
+    // Timer scheduled flags are initialized at the top
+    
+    
     while (MenuExit == MENU_EXIT_ZERO) {
-        // Update the screen
-        pdClear();
-        if (State.PaintAll && GlobalConfig.ScreensaverTime != -1) {
-            StyleFunc (Screen, &State, MENU_FUNCTION_PAINT_ALL, NULL);
-            State.PaintAll = FALSE;
-        }
-        else if (State.PaintSelection) {
-            StyleFunc (Screen, &State, MENU_FUNCTION_PAINT_SELECTION, NULL);
-            State.PaintSelection = FALSE;
-        }
-        pdDraw();
-
-        // DA-TAG: Investigate This
-        //         Toggle the selection once to work around failure to
-        //         display the default selection on load in text mode.
-        //         This is a Workaround ... Proper solution needed.
-        if (!Rotated) {
-            Rotated = TRUE;
-            if (State.ScrollMode == SCROLL_MODE_TEXT) {
-                if (State.CurrentSelection < State.MaxIndex) {
-                    UpdateScroll (&State, SCROLL_LINE_DOWN);
-                    REFIT_CALL_1_WRAPPER(gBS->Stall, 1250);
-                    UpdateScroll (&State, SCROLL_LINE_UP);
-                }
-                else if (State.CurrentSelection > 0) {
-                    UpdateScroll (&State, SCROLL_LINE_UP);
-                    REFIT_CALL_1_WRAPPER(gBS->Stall, 1250);
-                    UpdateScroll (&State, SCROLL_LINE_DOWN);
-                }
-                else {
-                    UpdateScroll (&State, SCROLL_NONE);
-                }
-            }
-        }
-
-        if (HaveTimeout) {
-            CurrentTime = (TimeoutCountdown + 5) / 10;
-            if (CurrentTime != PreviousTime) {
-               TimeoutMessage = PoolPrint (
-                   L"%s in %d Seconds",
-                   Screen->TimeoutText,
-                   CurrentTime
-               );
-
-               if (GlobalConfig.ScreensaverTime != -1) {
-                   StyleFunc (
-                       Screen, &State,
-                       MENU_FUNCTION_PAINT_TIMEOUT,
-                       TimeoutMessage
-                   );
-               }
-
-               MY_FREE_POOL(TimeoutMessage);
-
-               PreviousTime = CurrentTime;
-            }
-        }
-
-        // Read keypress or pointer event (and wait for them if applicable)
-        if (!PointerEnabled) {
-            PointerStatus = EFI_NOT_READY;
-        }
-        else {
-            PointerStatus = pdUpdateState();
-        }
-
+        UINT64 CurrentTime = GetCurrentMS(); // Get current time at start of loop
+        
+        // Read keypress without waiting
         Status = REFIT_CALL_2_WRAPPER(gST->ConIn->ReadKeyStroke, gST->ConIn, &key);
-        if (!EFI_ERROR(Status)) {
-            PointerActive      = FALSE;
+        
+        // Always update pointer state if enabled
+        if (PointerEnabled) {
+            // pdUpdateState also calls pdClear to erase the pointer from its previous position.
+            PointerStatus = pdUpdateState();
+            if (!EFI_ERROR(PointerStatus)) {
+                PointerActive = TRUE;
+                CurrentPointerState = pdGetState(); // Get the updated state
+            } else {
+                PointerActive = FALSE; // Ensure PointerActive is false if pdUpdateState fails
+                // If PointerActive becomes false, ensure PreviousPointerPressed is also reset
+                PreviousPointerPressed = FALSE;
+            }
+        }
+        
+        // Check for input
+        BOOLEAN InputDetectedThisIteration = FALSE;
+        if (!EFI_ERROR(Status)) { // Key press
+            InputDetectedThisIteration = TRUE;
+        } else if (PointerEnabled && PointerActive) { // Pointer active
+            // Consider pointer active as input for timer reset
+            // Debouncing for clicks/scroll actions is handled later in input processing
+            InputDetectedThisIteration = TRUE;
+        }
+        
+        // Timer and Screensaver Logic:
+        if (InputDetectedThisIteration) {
+            TimeSinceKeystroke = 0; // Reset screensaver timer
+            
+            // Cancel scheduled timer updates on input
+            NextTimeoutUpdateTime = 0;
+            NextScreensaverUpdateTime = 0;
+            
+            
+            // Cancel timeout display and countdown on input
+            if (HaveTimeout) {
+                StyleFunc (Screen, &State, MENU_FUNCTION_PAINT_TIMEOUT, L"");
+                HaveTimeout = FALSE; // Cancel the timeout itself for this menu instance
+                // Reset TimeoutCountdown here so that if the menu is re-entered,
+                // the timer starts from the beginning.
+                TimeoutCountdown = Screen->TimeoutSeconds * 10;
+            }
+            
+            // If screensaver was active and input occurred, exit screensaver
+            // (Handled by TimeSinceKeystroke reset and SaveScreen logic)
+            
+        } else { // No input detected in this iteration
+            // Schedule timer updates if not scheduled and a timer is configured
+            if (NextTimeoutUpdateTime == 0 && HaveTimeout) {
+                NextTimeoutUpdateTime = CurrentTime + 100;    // Schedule first timeout update in 100ms
+            }
+            if (NextScreensaverUpdateTime == 0 && GlobalConfig.ScreensaverTime > 0) {
+                NextScreensaverUpdateTime = CurrentTime + 100; // Schedule first screensaver update in 100ms
+            }
+            
+            
+            // Update timer if scheduled and it's time
+            // Check if *either* timer is scheduled before proceeding
+            if (NextTimeoutUpdateTime != 0 || NextScreensaverUpdateTime != 0) {
+                // Update Timeout Countdown
+                if (HaveTimeout && CurrentTime >= NextTimeoutUpdateTime) {
+                    TimeoutCountdown--;
+                    NextTimeoutUpdateTime += 100; // Schedule next update 100ms later
+                    
+                    // Update displayed timeout seconds
+                    CurrentTime = (TimeoutCountdown + 5) / 10; // Use a local var here to avoid confusion
+                    if (CurrentTime != PreviousTime) {
+                        TimeoutMessage = PoolPrint (
+                                                    L"%s in %d Seconds",
+                                                    Screen->TimeoutText,
+                                                    CurrentTime
+                                                    );
+                        StyleFunc (
+                                   Screen, &State,
+                                   MENU_FUNCTION_PAINT_TIMEOUT,
+                                   TimeoutMessage
+                                   );
+                        MY_FREE_POOL(TimeoutMessage);
+                        PreviousTime = CurrentTime;
+                    }
+                    if (TimeoutCountdown == 0) {
+                        // Timeout expired
+#if REFIT_DEBUG > 0
+                        ALT_LOG(1, LOG_LINE_NORMAL,
+                                L"Menu Timeout Expired:- '%d Seconds'",
+                                Screen->TimeoutSeconds // Use initial seconds for logging
+                                );
+#endif
+                        MenuExit = MENU_EXIT_TIMEOUT;
+                        // Do not break here, let the loop finish its current iteration before exiting.
+                    }
+                }
+                
+                // Update Screensaver Timer
+                if (GlobalConfig.ScreensaverTime > 0 && CurrentTime >= NextScreensaverUpdateTime) {
+                    TimeSinceKeystroke++; // Increment screensaver timer (in 1/10 seconds)
+                    NextScreensaverUpdateTime += 100; // Schedule next update 100ms later
+                    
+                    if (TimeSinceKeystroke >= (GlobalConfig.ScreensaverTime * 10)) {
+                        SaveScreen(); // Activate screensaver
+                        State.PaintAll = TRUE; // Ensure full repaint after screensaver
+                        TimeSinceKeystroke = 0; // Reset screensaver timer
+                        NextScreensaverUpdateTime = CurrentTime + 100; // Reschedule from now
+                        if (!AllowGraphicsMode) {
+                            PrepareBlankLine();
+                            DrawScreenHeader (Screen->Title);
+                        }
+                    }
+                }
+                
+                // If both timeout and screensaver are not active anymore, stop scheduling by resetting next update times
+                if (!HaveTimeout && GlobalConfig.ScreensaverTime <= 0) {
+                    NextTimeoutUpdateTime = 0;
+                    NextScreensaverUpdateTime = 0;
+                }
+            }
+        }
+        
+        
+        // Drawing Logic:
+        // Clear and draw everything only if a full paint is requested
+        if (State.PaintAll) {
+            // Ensure pointer is cleared from its last position before a full redraw
+            if (PointerEnabled && PointerActive) {
+                pdClear(); // pdClear is called by pdUpdateState, but this extra call might help if needed
+            }
+            StyleFunc(Screen, &State, MENU_FUNCTION_PAINT_ALL, NULL);
+            State.PaintAll = FALSE; // Reset the flag
+            State.PaintSelection = FALSE; // After a full paint, no selection change needs immediate painting
+            
+        } else {
+            // If not full paint, handle selection changes triggered by pointer hover or keys
+            if (State.PaintSelection) {
+                // Explicitly clear the pointer from its previous position just before redraws
+                // This helps ensure the area is clean before we redraw the item's background.
+                if (PointerEnabled && PointerActive) {
+                    pdClear(); // Call pdClear again here
+                }
+                
+                // ** Suppress pointer drawing while we redraw the items **
+                // This flag is checked by pdDraw() in pointer.c
+                gSuppressPointerDraw = TRUE;
+                
+                // pdClear() was just called (and also by pdUpdateState at loop start).
+                // StyleFunc now draws the updated item areas (unselected previous, selected current).
+                
+                StyleFunc(Screen, &State, MENU_FUNCTION_PAINT_SELECTION, NULL); // Perform the redraws
+                
+                State.PaintSelection = FALSE; // Reset the flag
+                
+                // ** Re-enable pointer drawing after redraws are complete **
+                gSuppressPointerDraw = FALSE;
+            }
+            // Any other partial updates would go here.
+        }
+        
+        // Present the buffer to the screen AND draw pointer (if not suppressed by the flag)
+        // pdDraw() handles drawing the pointer at the current position and checks gSuppressPointerDraw.
+        // We ALWAYS call pdDraw here in each loop iteration if pointer is enabled/active.
+        if (PointerEnabled && PointerActive) {
+            pdDraw(); // Call pdDraw regardless of PaintSelection state. It will draw if gSuppressPointerDraw is FALSE.
+        }
+        
+        
+        // Add a small stall to prevent the loop from consuming too much CPU time
+        // Adjust the stall value as needed to balance smoothness and performance.
+        // 15000 microseconds = 15 milliseconds (closer to 60Hz frame time)
+        REFIT_CALL_1_WRAPPER(gBS->Stall, 15000);
+        
+        
+        // Check if MenuExit was set by timeout or input processing
+        if (MenuExit != MENU_EXIT_ZERO) {
+            break;
+        }
+        
+        // --- Input Processing Block ---
+        // Process input based on whether a key was pressed or pointer is active
+        if (!EFI_ERROR(Status)) { // Key press detected
+            // Timer reset handled above in InputDetectedThisIteration block
+            PointerActive      = FALSE; // Key press takes precedence over pointer activity for input handling
             DrawSelection      =  TRUE;
-            TimeSinceKeystroke =     0;
-        }
-        else if (!EFI_ERROR(PointerStatus)) {
-            PointerActive      = TRUE;
-            TimeSinceKeystroke =    0;
-
-            if (StyleFunc != MainMenuStyle && pdGetState().Press) {
-                // Prevent user from getting stuck on submenus
-                // Only the 'About' screen is currently reachable without a keyboard
-                MenuExit = MENU_EXIT_ENTER;
-                break;
-            }
-        }
-        else {
-            if (HaveTimeout && TimeoutCountdown == 0) {
-                // Timeout expired
-                #if REFIT_DEBUG > 0
-                ALT_LOG(1, LOG_LINE_NORMAL,
-                    L"Menu Timeout Expired:- '%d Seconds'",
-                    Screen->TimeoutSeconds
-                );
-                #endif
-
-                MenuExit = MENU_EXIT_TIMEOUT;
-                break;
-            }
-
-            if (!HaveTimeout && GlobalConfig.ScreensaverTime < 1) {
-                WaitForInput (0);
-            }
-            else {
-                ElapsCount =                   1;
-                Input      = WaitForInput (1000); // 1s Timeout
-
-                if (Input == INPUT_KEY ||
-                    Input == INPUT_POINTER
-                ) {
-                    TimeSinceKeystroke = 0;
-                    continue;
-                }
-
-                if (Input == INPUT_TIMEOUT) {
-                    // Always counted as is to end of the timeout
-                    ElapsCount = 10;
-                }
-
-                TimeSinceKeystroke += ElapsCount;
-                if (HaveTimeout) {
-                    TimeoutCountdown = (TimeoutCountdown > ElapsCount)
-                        ? TimeoutCountdown - ElapsCount : 0;
-                }
-                else if (
-                    GlobalConfig.ScreensaverTime > 0 &&
-                    TimeSinceKeystroke > (GlobalConfig.ScreensaverTime * 10)
-                ) {
-                    SaveScreen();
-                    State.PaintAll     = TRUE;
-                    TimeSinceKeystroke =    0;
-
-                    if (!AllowGraphicsMode) {
-                        PrepareBlankLine();
-                        DrawScreenHeader (Screen->Title);
-                    }
-                }
-            } // if/else !HaveTimeout
-
-            continue;
-        } // if/else !EFI_ERROR(Status)
-
-        if (HaveTimeout) {
-            // User pressed a key ... Cancel timeout
-            StyleFunc (Screen, &State, MENU_FUNCTION_PAINT_TIMEOUT, L"");
-            HaveTimeout = FALSE;
-
-            if (GlobalConfig.ScreensaverTime == -1) {
-                // Cancel start-with-blank-screen coding
-                GlobalConfig.ScreensaverTime = 0;
-
-                if (!GlobalConfig.TextOnly) {
-                    BltClearScreen (TRUE);
-                }
-            }
-        }
-
-        if (!PointerActive) {
-            // React to key press
+            PreviousPointerPressed = FALSE; // Reset pointer pressed state on key input
+            
+            
+            // React to key press (setting MenuExit)
             switch (key.ScanCode) {
-                case SCAN_RIGHT:     UpdateScroll (&State, SCROLL_LINE_RIGHT);  break;
-                case SCAN_LEFT:      UpdateScroll (&State, SCROLL_LINE_LEFT );  break;
-                case SCAN_DOWN:      UpdateScroll (&State, SCROLL_LINE_DOWN );  break;
-                case SCAN_UP:        UpdateScroll (&State, SCROLL_LINE_UP   );  break;
-                case SCAN_END:       UpdateScroll (&State, SCROLL_LAST      );  break;
-                case SCAN_HOME:      UpdateScroll (&State, SCROLL_FIRST     );  break;
-                case SCAN_PAGE_UP:   UpdateScroll (&State, SCROLL_PAGE_UP   );  break;
-                case SCAN_PAGE_DOWN: UpdateScroll (&State, SCROLL_PAGE_DOWN );  break;
+                case SCAN_RIGHT:     UpdateScroll (&State, SCROLL_LINE_RIGHT); State.PaintAll = TRUE; break; // Scrolling needs full paint
+                case SCAN_LEFT:      UpdateScroll (&State, SCROLL_LINE_LEFT ); State.PaintAll = TRUE; break;  // Scrolling needs full paint
+                case SCAN_DOWN:      UpdateScroll (&State, SCROLL_LINE_DOWN ); State.PaintAll = TRUE; break;  // Scrolling needs full paint
+                case SCAN_UP:        UpdateScroll (&State, SCROLL_LINE_UP   ); State.PaintAll = TRUE; break;  // Scrolling needs full paint
+                case SCAN_END:       UpdateScroll (&State, SCROLL_LAST      ); State.PaintAll = TRUE; break;  // Scrolling needs full paint
+                case SCAN_HOME:      UpdateScroll (&State, SCROLL_FIRST     ); State.PaintAll = TRUE; break;  // Scrolling needs full paint
+                case SCAN_PAGE_UP:   UpdateScroll (&State, SCROLL_PAGE_UP   ); State.PaintAll = TRUE; break;  // Scrolling needs full paint
+                case SCAN_PAGE_DOWN: UpdateScroll (&State, SCROLL_PAGE_DOWN ); State.PaintAll = TRUE; break;  // Scrolling needs full paint
                 case SCAN_INSERT:
-                case SCAN_F2:                  MenuExit = MENU_EXIT_DETAILS   ; break;
-                case SCAN_F10:                 MenuExit = MENU_EXIT_SCREENSHOT; break;
-                case SCAN_ESC:                 MenuExit = MENU_EXIT_ESCAPE    ; break;
-                case SCAN_DELETE:              MenuExit = MENU_EXIT_HIDE      ; break;
+                case SCAN_F2:                    MenuExit = MENU_EXIT_DETAILS   ; break;
+                case SCAN_F10:                   MenuExit = MENU_EXIT_SCREENSHOT; break;
+                case SCAN_ESC:                   MenuExit = MENU_EXIT_ESCAPE    ; break;
+                case SCAN_DELETE:                MenuExit = MENU_EXIT_HIDE      ; break;
                 case 0x0016: if (EjectMedia()) MenuExit = MENU_EXIT_ESCAPE    ; break; // F12
-            } // switch
-
-            switch (key.UnicodeChar) {
-                case CHAR_LINEFEED:
-                case CHAR_CARRIAGE_RETURN: MenuExit = MENU_EXIT_ENTER     ;     break;
-                case ' ':
-                case CHAR_BACKSPACE:       MenuExit = MENU_EXIT_ESCAPE    ;     break;
-                case '+':
-                case CHAR_TAB:             MenuExit = MENU_EXIT_DETAILS   ;     break;
-                case '-':                  MenuExit = MENU_EXIT_HIDE      ;     break;
-                case '\\':                 MenuExit = MENU_EXIT_SCREENSHOT;     break;
-                default:
-                    KeyAsString[1] = 0;
-                    KeyAsString[0] = key.UnicodeChar;
-                    ShortcutEntry  = FindMenuShortcutEntry (Screen, KeyAsString);
-
-                    if (ShortcutEntry >= 0) {
-                        State.CurrentSelection = ShortcutEntry;
-                        MenuExit = MENU_EXIT_ENTER;
-                    }
-
-                    break;
-            } // switch
-
-            // Flag 'UserKeyPress' on Selection Change
+                default: // Handle shortcut keys or enter/space/etc.
+                    switch (key.UnicodeChar) {
+                        case CHAR_LINEFEED:
+                        case CHAR_CARRIAGE_RETURN: MenuExit = MENU_EXIT_ENTER     ; break;
+                        case ' ':
+                        case CHAR_BACKSPACE:       MenuExit = MENU_EXIT_ESCAPE    ; break;
+                        case '+':
+                        case CHAR_TAB:             MenuExit = MENU_EXIT_DETAILS   ; break;
+                        case '-':                  MenuExit = MENU_EXIT_HIDE      ; break;
+                        case '\\':                 MenuExit = MENU_EXIT_SCREENSHOT; break;
+                        default:
+                            KeyAsString[1] = 0;
+                            KeyAsString[0] = key.UnicodeChar;
+                            ShortcutEntry  = FindMenuShortcutEntry (Screen, KeyAsString);
+                            if (ShortcutEntry >= 0) {
+                                State.CurrentSelection = ShortcutEntry;
+                                MenuExit = MENU_EXIT_ENTER;
+                            }
+                            break;
+                    } // switch UnicodeChar
+                    break; // Break from ScanCode switch after handling UnicodeChar
+            } // switch ScanCode
+            
+            
+            // Flag 'UserKeyPress' on Selection Change (existing logic) - only for navigation keys
             switch (key.ScanCode) {
-                case SCAN_END:
-                case SCAN_HOME:
-                case SCAN_PAGE_UP:
-                case SCAN_PAGE_DOWN:
-                case SCAN_UP:
-                case SCAN_LEFT:
-                case SCAN_DOWN:
-                case SCAN_RIGHT: UserKeyPress = TRUE;
+                case SCAN_END: case SCAN_HOME: case SCAN_PAGE_UP: case SCAN_PAGE_DOWN:
+                case SCAN_UP: case SCAN_LEFT: case SCAN_DOWN: case SCAN_RIGHT: UserKeyPress = TRUE; break;
             } // switch
-
-            // Flag 'UserKeyScan' on Detecting Some Inputs
-            switch (key.UnicodeChar) {
-                case CHAR_BACKSPACE:
-                case CHAR_TAB:
-                case '+':
-                case '-':
-                default: UserKeyScan = TRUE;
-            } // switch
-
-            #if REFIT_DEBUG > 0
+            
+            // Flag 'UserKeyScan' on Detecting Some Inputs (existing logic) - for various inputs
+            UserKeyScan = TRUE; // Assume any key press indicates user scan
+            
+#if REFIT_DEBUG > 0
             KeyTxt = GetScanCodeText (key.ScanCode);
             if (MyStriCmp (KeyTxt, L"KEY_UNKNOWN")) {
                 switch (key.UnicodeChar) {
-                    case CHAR_LINEFEED:        KeyTxt = L"INFER_ENTER    Key: LineFeed"      ; break;
-                    case CHAR_CARRIAGE_RETURN: KeyTxt = L"INFER_ENTER    Key: CarriageReturn"; break;
-                    case CHAR_BACKSPACE:       KeyTxt = L"INFER_ESCAPE   Key: BackSpace"     ; break;
-                    case ' ':                  KeyTxt = L"INFER_ESCAPE   Key: SpaceBar"      ; break;
-                    case CHAR_TAB:             KeyTxt = L"INFER_DETAILS  Key: Tab"           ; break;
-                    case '+':                  KeyTxt = L"INFER_DETAILS  Key: '+' (Plus)"    ; break;
-                    case '-':                  KeyTxt = L"INFER_REMOVE   Key: '-' (Minus)"   ; break;
+                    case CHAR_LINEFEED:        KeyTxt = L"INFER_ENTER     Key: LineFeed"     ; break;
+                    case CHAR_CARRIAGE_RETURN: KeyTxt = L"INFER_ENTER     Key: CarriageReturn"; break;
+                    case CHAR_BACKSPACE:       KeyTxt = L"INFER_ESCAPE    Key: BackSpace"    ; break;
+                    case ' ':                  KeyTxt = L"INFER_ESCAPE    Key: SpaceBar"     ; break;
+                    case CHAR_TAB:             KeyTxt = L"INFER_DETAILS   Key: Tab"          ; break;
+                    case '+':                  KeyTxt = L"INFER_DETAILS   Key: '+' (Plus)"   ; break;
+                    case '-':                  KeyTxt = L"INFER_REMOVE    Key: '-' (Minus)"  ; break;
                 } // switch
             }
             ALT_LOG(1, LOG_LINE_NORMAL,
-                L"Got Keystroke: UnicodeChar = 0x%02X ... ScanCode = 0x%02X - %s",
-                key.UnicodeChar, key.ScanCode, KeyTxt
-            );
-            #endif
-
+                    L"Got Keystroke: UnicodeChar = 0x%02X ... ScanCode = 0x%02X - %s",
+                    key.UnicodeChar, key.ScanCode, KeyTxt
+                    );
+#endif
+            
             if (BlockRescan) {
                 if (MenuExit == MENU_EXIT_ESCAPE) {
-                    MenuExit = MENU_EXIT_ZERO;
+                    MenuExit = MENU_EXIT_ZERO; // Ignore Escape if BlockRescan
                 }
                 else if (MenuExit == MENU_EXIT_ZERO) {
-                    // Unblock Rescan on Selection Change
+                    // Unblock Rescan on Selection Change or other inputs
                     switch (key.ScanCode) {
-                        case SCAN_END:
-                        case SCAN_HOME:
-                        case SCAN_PAGE_UP:
-                        case SCAN_PAGE_DOWN:
-                        case SCAN_UP:
-                        case SCAN_LEFT:
-                        case SCAN_DOWN:
-                        case SCAN_RIGHT: BlockRescan = FALSE;
-                    } // switch
-
-                    // Unblock Rescan on Detecting Some Inputs
+                        case SCAN_END: case SCAN_HOME: case SCAN_PAGE_UP: case SCAN_PAGE_DOWN:
+                        case SCAN_UP: case SCAN_LEFT: case SCAN_DOWN: case SCAN_RIGHT: BlockRescan = FALSE; break;
+                    }
                     switch (key.UnicodeChar) {
-                        case CHAR_BACKSPACE:
-                        case CHAR_TAB:
-                        case '+':
-                        case '-':
-                        default: BlockRescan = FALSE;
-                    } // switch
+                        case CHAR_BACKSPACE: case CHAR_TAB: case '+': case '-': default: BlockRescan = FALSE; break;
+                    }
                 }
             }
-
+            
             if (MenuExit == MENU_EXIT_SCREENSHOT) {
                 if (!GlobalConfig.DecoupleKeyF10 || key.ScanCode != SCAN_F10) {
                     egScreenShot();
-
-                    // Unblock Rescan and Refresh Screen
-                    BlockRescan = FALSE;
-                    State.PaintAll = TRUE;
-                    WaitForRelease = TRUE;
+                    BlockRescan = FALSE; // Unblock Rescan after screenshot
+                    State.PaintAll = TRUE; // Refresh Screen after screenshot
                 }
-
-                MenuExit = MENU_EXIT_ZERO;
-                continue;
+                MenuExit = MENU_EXIT_ZERO; // Stay in menu after screenshot
             }
-        }
-        else {
+            
+        } else if (PointerEnabled && PointerActive) { // Pointer is active and no key was pressed
+            // Timer reset handled above in InputDetectedThisIteration block
+            
             if (StyleFunc != MainMenuStyle) {
-                // Nothing to find on submenus
-                continue;
+                // Nothing to find on submenus for pointer interaction (based on original code)
+                // Check for click transition in sub-menus
+                if (CurrentPointerState.Press && !PreviousPointerPressed) {
+                    MenuExit = MENU_EXIT_ENTER; // Exit loop on click in sub-menu
+                }
+            } else { // Main menu, process pointer movement and clicks
+                State.PreviousSelection = State.CurrentSelection;
+                // Use CurrentPointerState obtained earlier
+                Item = FindMainMenuItem (
+                                         Screen, &State,
+                                         CurrentPointerState.X, CurrentPointerState.Y
+                                         );
+                switch (Item) {
+                    case POINTER_NO_ITEM:
+                        if (DrawSelection) {
+                            DrawSelection = FALSE;
+                            // Mark for selection repaint if leaving a selected item area
+                            if (State.PreviousSelection != POINTER_NO_ITEM) { // Check if previously hovered over an item
+                                State.PaintSelection = TRUE;
+                            }
+                        }
+                        break;
+                    case POINTER_LEFT_ARROW:
+                        // Only trigger on press transition for debouncing
+                        if (CurrentPointerState.Press && !PreviousPointerPressed) {
+                            UpdateScroll (&State, SCROLL_PAGE_UP);
+                            UserKeyPress = TRUE; // Treat pointer navigation as user activity
+                            BlockRescan = FALSE;
+                            State.PaintAll = TRUE; // Scroll requires full paint
+                            State.PaintSelection = TRUE; // Ensure selection redrawn after scroll
+                        }
+                        // If hovering over arrow, maybe update selection visually?
+                        // Assuming no selection highlight on arrows themselves in the selection area.
+                        // Let's explicitly set PaintSelection to FALSE for arrows unless the style function handles it.
+                        State.PaintSelection = FALSE;
+                        // Debug logging for pointer event
+#if REFIT_DEBUG > 0
+                        ALT_LOG(1, LOG_LINE_NORMAL, L"Process Pointer Event ... Arrow Left");
+#endif
+                        break;
+                    case POINTER_RIGHT_ARROW:
+                        // Only trigger on press transition for debouncing
+                        if (CurrentPointerState.Press && !PreviousPointerPressed) {
+                            UpdateScroll (&State, SCROLL_PAGE_DOWN);
+                            UserKeyPress = TRUE; // Treat pointer navigation as user activity
+                            BlockRescan = FALSE;
+                            State.PaintAll = TRUE; // Scroll requires full paint
+                            State.PaintSelection = TRUE; // Ensure selection redrawn after scroll
+                        }
+                        // If hovering over arrow, maybe update selection visually?
+                        // Assuming no selection highlight on arrows themselves in the selection area.
+                        // Let's explicitly set PaintSelection to FALSE for arrows unless the style function handles it.
+                        State.PaintSelection = FALSE;
+                        // Debug logging for pointer event
+#if REFIT_DEBUG > 0
+                        ALT_LOG(1, LOG_LINE_NORMAL, L"Process Pointer Event ... Arrow Right");
+#endif
+                        break;
+                    default: // A main menu item is hovered or clicked
+                        // Update selection on hover
+                        if (!DrawSelection || Item != State.CurrentSelection) {
+                            DrawSelection          = TRUE;
+                            State.PaintSelection   = TRUE; // Mark for selection repaint
+                            State.CurrentSelection = Item;
+                        }
+                        // Trigger action on click transition
+                        if (CurrentPointerState.Press && !PreviousPointerPressed) {
+                            MenuExit = MENU_EXIT_ENTER; // Exit the loop and boot
+                            // Debug logging for pointer event
+#if REFIT_DEBUG > 0
+                            ALT_LOG(1, LOG_LINE_NORMAL, L"Process Pointer Event ... Enter (Click)");
+#endif
+                        }
+                        // If hovering over an item and selection state *didn't* change,
+                        // and DrawSelection is true, State.PaintSelection is not set above.
+                        // But the PaintSelection logic handles redrawing the current selection
+                        // if State.PaintSelection is true.
+                        // The key is that when the pointer *leaves* an item or moves to a *different* item,
+                        // the previous highlight is erased and the new one is drawn (handled by PaintSelection).
+                } // switch (Item)
             }
-
-            State.PreviousSelection = State.CurrentSelection;
-            POINTER_STATE PointerState = pdGetState();
-            Item = FindMainMenuItem (
-                Screen, &State,
-                PointerState.X, PointerState.Y
-            );
-
-            switch (Item) {
-                case POINTER_NO_ITEM:
-                    if (DrawSelection) {
-                        DrawSelection        = FALSE;
-                        State.PaintSelection = TRUE;
-                    }
-
-                break;
-                case POINTER_LEFT_ARROW:
-                    if (PointerState.Press) {
-                        UpdateScroll (&State, SCROLL_PAGE_UP);
-                        UserKeyPress = TRUE;
-                        BlockRescan = FALSE;
-                    }
-
-                    if (DrawSelection) {
-                        DrawSelection        = FALSE;
-                        State.PaintSelection = TRUE;
-                    }
-
-                    // React to Pointer Event
-                    #if REFIT_DEBUG > 0
-                    ALT_LOG(1, LOG_LINE_NORMAL,
-                        L"Process Pointer Event ... Arrow Left"
-                    );
-                    #endif
-
-                break;
-                case POINTER_RIGHT_ARROW:
-                    if (PointerState.Press) {
-                        UpdateScroll (&State, SCROLL_PAGE_DOWN);
-                        UserKeyPress = TRUE;
-                        BlockRescan = FALSE;
-                    }
-
-                    if (DrawSelection) {
-                        DrawSelection        = FALSE;
-                        State.PaintSelection = TRUE;
-                    }
-
-                    // React to Pointer Event
-                    #if REFIT_DEBUG > 0
-                    ALT_LOG(1, LOG_LINE_NORMAL,
-                        L"Process Pointer Event ... Arrow Right"
-                    );
-                    #endif
-
-                break;
-                default:
-                    if (!DrawSelection || Item != State.CurrentSelection) {
-                        DrawSelection          = TRUE;
-                        State.PaintSelection   = TRUE;
-                        State.CurrentSelection = Item;
-                    }
-
-                    if (PointerState.Press) {
-                        MenuExit = MENU_EXIT_ENTER;
-
-                        // React to Pointer Event
-                        #if REFIT_DEBUG > 0
-                        ALT_LOG(1, LOG_LINE_NORMAL,
-                            L"Process Pointer Event ... Enter"
-                        );
-                        #endif
-                    }
-            } // switch
-        } // if/else !PointerActive
+            // Update PreviousPointerPressed for the next iteration after processing pointer input
+            PreviousPointerPressed = CurrentPointerState.Press;
+            
+        } else { // No key press and pointer not active (or pdUpdateState failed)
+            // Update PreviousPointerPressed even if pointer is not active, ensures correct state on re-activation
+            PreviousPointerPressed = CurrentPointerState.Press; // This will be false if PointerActive is false
+        }
+        // --- End Input Processing Block ---
+        
+        
     } // while
-
-    pdClear();
+    
+    // Final cleanup for the pointer before exiting the menu screen
+    // Clear pointer from its last position using pdClear's background restore
+    // This call outside the loop is good practice to remove the pointer before exiting graphics mode.
+    if (PointerEnabled && PointerActive) {
+        pdClear(); // Clear pointer from its last position
+        // No need to pdDraw here, we are exiting graphics mode or the function.
+        // The screen will be cleared or changed anyway.
+    }
+    
     StyleFunc (Screen, &State, MENU_FUNCTION_CLEANUP, NULL);
-
+    
     // Ignore MenuExit if FlushFailedTag is set and not previously reset
     if (FlushFailedTag && !FlushFailReset) {
-        #if REFIT_DEBUG > 0
+#if REFIT_DEBUG > 0
         MsgStr = StrDuplicate (L"FlushFailedTag is Set ... Ignore MenuExit");
         ALT_LOG(1, LOG_STAR_SEPARATOR, L"%s", MsgStr);
         LOG_MSG("INFO: %s", MsgStr);
         LOG_MSG("\n\n");
         MY_FREE_POOL(MsgStr);
-        #endif
-
+#endif
+        
         FlushFailedTag = FALSE;
         FlushFailReset = TRUE;
         MenuExit = MENU_EXIT_ZERO;
     }
-
+    
     do {
         if (UserKeyPress || UserKeyScan) {
             OneMainLoop = TRUE;
             break;
         }
-
-        if (!IsMainMenu              ||
+        
+        if (!IsMainMenu               ||
             ClearedBuffer            ||
             AppleFirmware            ||
             FlushFailReset           ||
             GlobalConfig.DirectBoot  ||
             MenuExit != MENU_EXIT_ENTER
-        ) {
+            ) {
             break;
         }
-
+        
         // Ignore MenuExit if time between loading main menu and detecting
-        // an 'Enter' keypress is too low. Primed Keystroke Buffers appear
+        // an 'Enter' keypress is too low.
+        // Primed Keystroke Buffers appear
         // to only affect UEFI PC but some provision to cover Macs made
         MenuExitNumb = 768; // 512 + 256
         MenuExitGate = MenuExitNumb;
         MenuExitTime = GetCurrentMS();
         MenuExitDiff = MenuExitTime - MainMenuLoad;
-
+        
         if (GlobalConfig.MitigatePrimedBuffer) {
             MenuExitGate = MenuExitNumb * 3;
-
-            #if REFIT_DEBUG > 0
+#if REFIT_DEBUG > 0
             if (GlobalConfig.LogLevel > 1) {
                 MenuExitGate = MenuExitNumb * 5;
             }
             else if (GlobalConfig.LogLevel > 0) {
                 MenuExitGate = MenuExitNumb * 4;
             }
-            #endif
-
+#endif
+            
             if (FoundExternalDisk) {
                 MenuExitGate = MenuExitGate * 4;
             }
         }
-
+        
         if (MenuExitDiff < MenuExitGate) {
-            #if REFIT_DEBUG > 0
+#if REFIT_DEBUG > 0
             LOG_MSG("INFO: Invalid Post-Load MenuExit Interval ... Ignore MenuExit");
-            MsgStr = L"Mitigated Potential Persistent Primed Keystroke Buffer";
+            MsgStr = PoolPrint (L"Mitigated Potential Persistent Primed Keystroke Buffer ... TimeDiff: %llu ms", MenuExitDiff); // Added debug logging
             ALT_LOG(1, LOG_STAR_SEPARATOR, L"%s", MsgStr);
-            LOG_MSG("%s      %s", OffsetNext, MsgStr);
+            LOG_MSG("%s    %s", OffsetNext, MsgStr);
             LOG_MSG("\n\n");
-            #endif
-
+            MY_FREE_POOL(MsgStr);
+#endif
+            
             FlushFailedTag = FALSE;
             FlushFailReset = TRUE;
             MenuExit = MENU_EXIT_ZERO;
         }
     } while (0); // This 'loop' only runs once
-
+    
     if (ChosenOption) {
         *ChosenOption = Screen->Entries[State.CurrentSelection];
     }
-
+    
     *DefaultEntryIndex = State.CurrentSelection;
-
+    
     BREAD_CRUMB(L"%a:  2 - END:- return UINTN MenuExit = '%d'", __func__, MenuExit);
     LOG_DECREMENT();
     LOG_SEP(L"X");
-
+    
     return MenuExit;
 } // UINTN DrawMenuScreen()
-
-//
 // Generic text-mode style
 //
 
@@ -2179,52 +2210,118 @@ VOID GraphicsMenuStyle (
 // Graphical main menu style
 //
 
+// Modify this existing function in your menu.c file:
 static
 VOID DrawMainMenuEntry (
-    REFIT_MENU_ENTRY *Entry,
-    BOOLEAN           selected,
-    UINTN             XPos,
-    UINTN             YPos
-) {
+                        REFIT_MENU_ENTRY *Entry,
+                        BOOLEAN           selected,
+                        UINTN             XPos,
+                        UINTN             YPos
+                        ) {
     EG_IMAGE *Background;
-
-    // Do not draw selection image when not hoverin if using pointer
-    if (!selected || !DrawSelection) {
-        // Image not selected ... copy background
-        egDrawImageWithTransparency (
-            Entry->Image,
-            Entry->BadgeImage,
-            XPos, YPos,
-            SelectionImages[Entry->Row]->Width,
-            SelectionImages[Entry->Row]->Height
-        );
-
-        // Early Return
-        return;
+    // The selection image should only be drawn if selected AND DrawSelection is true.
+    // Otherwise, the normal background/icon should be drawn over the restored background area.
+    
+    // Determine the base drawing area size based on the selection image (this should match the area covered by the selection frame)
+    UINTN BaseAreaWidth = SelectionImages[Entry->Row]->Width;
+    UINTN BaseAreaHeight = SelectionImages[Entry->Row]->Height;
+    
+    // Define a small padding to expand the redraw area for unselected state
+    UINTN RedrawPadding = 4; // Add 2 pixels padding on each side (total 4 for width/height). You can adjust this value if needed.
+    
+    // Calculate the expanded redraw area for the unselected state
+    // Adjust XPos and YPos by the padding amount, and increase width/height by double the padding.
+    UINTN RedrawAreaWidth = BaseAreaWidth + RedrawPadding * 2;
+    UINTN RedrawAreaHeight = BaseAreaHeight + RedrawPadding * 2;
+    INTN RedrawXPos_signed = (INTN)XPos - (INTN)RedrawPadding;
+    INTN RedrawYPos_signed = (INTN)YPos - (INTN)RedrawPadding;
+    
+    // Ensure redraw area coordinates are not negative (handle potential underflow)
+    UINTN RedrawXPos = (RedrawXPos_signed < 0) ? 0 : (UINTN)RedrawXPos_signed;
+    UINTN RedrawYPos = (RedrawYPos_signed < 0) ? 0 : (UINTN)RedrawYPos_signed;
+    
+    // Adjust RedrawAreaWidth and RedrawAreaHeight if the starting position was clamped to 0
+    if (RedrawXPos == 0 && RedrawXPos_signed < 0) {
+        RedrawAreaWidth += RedrawXPos_signed; // Reduce width by the amount clamped
     }
-
-    Background = egCropImage (
-        GlobalConfig.ScreenBackground,
-        XPos, YPos,
-        SelectionImages[Entry->Row]->Width,
-        SelectionImages[Entry->Row]->Height
-    );
-
-    if (Background) {
-        egComposeImage (
-            Background,
-            SelectionImages[Entry->Row],
-            0, 0
-        );
-
-        BltImageCompositeAny (
-            Background,
-            Entry->Image,
-            Entry->BadgeImage,
-            XPos, YPos
-        );
-
-        MY_FREE_IMAGE(Background);
+    if (RedrawYPos == 0 && RedrawYPos_signed < 0) {
+        RedrawAreaHeight += RedrawYPos_signed; // Reduce height by the amount clamped
+    }
+    
+    
+    // Optional: Ensure redraw area does not exceed screen bounds.
+    // This depends on where ScreenW and ScreenH are defined and accessible.
+    // For now, rely on egCropImage handling bounds, but be aware.
+    // if (RedrawXPos + RedrawAreaWidth > ScreenW) RedrawAreaWidth = ScreenW - RedrawXPos;
+    // if (RedrawYPos + RedrawAreaHeight > ScreenH) RedrawAreaHeight = ScreenH - RedrawYPos;
+    
+    
+    if (selected && DrawSelection) {
+        // Draw selected state with SelectionImages and cropped background
+        Background = egCropImage (
+                                  GlobalConfig.ScreenBackground, // Use GlobalConfig.ScreenBackground for the full background
+                                  XPos, YPos,
+                                  BaseAreaWidth, // Use base area size for selected state drawing
+                                  BaseAreaHeight
+                                  );
+        if (Background) {
+            egComposeImage (
+                            Background,
+                            SelectionImages[Entry->Row], // Compose selection image onto background
+                            0, 0
+                            );
+            BltImageCompositeAny (
+                                  Background,         // Base image
+                                  Entry->Image,       // Top image (icon)
+                                  Entry->BadgeImage,  // Badge image
+                                  XPos, YPos
+                                  );
+            MY_FREE_IMAGE(Background);
+        } else {
+            // Fallback for drawing selected state if cropping fails
+            // We cannot accurately restore background. Drawing selection image and icon directly.
+            // Use BltImageCompositeAny with NULL base to draw on current buffer.
+            egDrawImage(SelectionImages[Entry->Row], XPos, YPos); // Draw selection image
+            BltImageCompositeAny (NULL, Entry->Image, Entry->BadgeImage, XPos, YPos); // Draw icon and badge over it
+        }
+    } else {
+        // Draw unselected state - redraw the background and the icon/badge
+        // Use the expanded redraw area to ensure the previous selection highlight is cleared.
+        
+        // Crop the background from the screen buffer for the expanded area
+        // This effectively "clears" the area by redrawing the original background content.
+        Background = egCropImage (
+                                  GlobalConfig.ScreenBackground, // Use GlobalConfig.ScreenBackground
+                                  RedrawXPos, RedrawYPos,
+                                  RedrawAreaWidth,
+                                  RedrawAreaHeight
+                                  );
+        
+        if (Background) {
+            // Draw the cropped background area to restore the original background
+            egDrawImage(Background, RedrawXPos, RedrawYPos); // Draw at the expanded coordinates
+            MY_FREE_IMAGE(Background);
+            
+            // Now draw the icon and badge on top of the restored background area
+            // The icon should be drawn at its original XPos, YPos
+            egDrawImageWithTransparency (
+                                         Entry->Image,
+                                         Entry->BadgeImage,
+                                         XPos, YPos, // Draw icon at original position
+                                         BaseAreaWidth, // Use base area size for icon drawing
+                                         BaseAreaHeight
+                                         );
+        } else {
+            // Fallback: if background cropping fails for the expanded area
+            // Revert to drawing with transparency at the original position, using base size.
+            egDrawImageWithTransparency (
+                                         Entry->Image,
+                                         Entry->BadgeImage,
+                                         XPos, YPos,
+                                         BaseAreaWidth,
+                                         BaseAreaHeight
+                                         );
+        }
     }
 } // VOID DrawMainMenuEntry()
 

@@ -179,7 +179,7 @@
 #define INITIAL_STRING_DELIM  L" @@ "
 
 // Define some colours
-#define COLOR_LIGHTBLUE {255, 175, 100, 0}
+#define COLOR_LIGHTBLUE {0, 0, 0, 0}
 #define COLOR_AMBER {255, 177, 0, 0}
 #define COLOR_RED {0, 0, 200, 0}
 
