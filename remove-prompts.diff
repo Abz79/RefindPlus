@@ -1,0 +1,47 @@
+diff --git a/BootMaster/main.c b/BootMaster/main.c
+index 14344dc..56dfb00 100644
+--- a/BootMaster/main.c
++++ b/BootMaster/main.c
+@@ -2359,10 +2359,15 @@ BOOLEAN ShowInfoShell (
+ 
+     RunOnce = TRUE;
+ 
+-    return HandleToolSelection (
++ /*   return HandleToolSelection (
+         ToolInfoMenu, ReturnEntryItem,
+         (LOADER_ENTRY ***) &ShellEntryItems
+     );
++ */
++    if (ShellEntryItemsCount > 0) {
++        StartTool((LOADER_ENTRY*)ShellEntryItems[0]); // Direct execution
++        return TRUE;
++    }
+ } // static BOOLEAN ShowInfoShell()
+ 
+ static
+@@ -3628,10 +3633,10 @@ VOID ResetCall (
+     #endif
+ 
+ 
+-    egDisplayMessage (
+-        TypeStr, &BGColorBase,
+-        CENTER, 3, L"PauseSeconds"
+-    );
++ //   egDisplayMessage (
++ //       TypeStr, &BGColorBase,
++ //       CENTER, 3, L"PauseSeconds"
++ //   );
+ 
+     #if REFIT_DEBUG > 0
+     MsgStr = (IsRestart)
+diff --git a/BootMaster/menu.c b/BootMaster/menu.c
+index 0792fa9..9cc41e0 100644
+--- a/BootMaster/menu.c
++++ b/BootMaster/menu.c
+@@ -4551,5 +4551,5 @@ BOOLEAN GetMenuEntryYesNo (
+     MenuEntryNo->Tag   = TAG_NO;
+     AddMenuEntry (*Screen, MenuEntryNo);
+ 
+-    return TRUE;
++    return TRUE;/*/*/
+ } // BOOLEAN GetMenuEntryYesNo()
