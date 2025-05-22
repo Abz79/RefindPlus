@@ -24,7 +24,7 @@
  *
  * Modifications distributed under the preceding terms.
  */
-
+BOOLEAN gSuppressPointerDraw = FALSE;
 #include "global.h"
 #include "pointer.h"
 #include "screenmgt.h"
@@ -548,7 +548,30 @@ VOID pdDraw (VOID) {
         return;
     }
 
-    MY_FREE_IMAGE(Background);
+    // --- Added Debug Log ---
+    #if REFIT_DEBUG > 1 // Use loglevel2
+    LOG_MSG("pdDraw: Drawing at X=%d, Y=%d\n", State.X, State.Y);
+    #endif
+    // --- End Debug Log ---
+    // Add this check at the beginning
+    if (gSuppressPointerDraw) {
+        return; // Exit without drawing the pointer if suppressed
+    }
+    if (!MouseTouchActive) {
+        return;
+    }
+    // --- Potential Adjustment 2: Redraw optimization check ---
+    // Only redraw if the position has actually changed
+
+//    if (State.X == LastXPos && State.Y == LastYPos && Background != NULL) {
+         // Position hasn't changed and background is already cleared, no need to redraw
+ //        return;
+ //   }
+
+    // --- End Potential Adjustment 2 ---
+
+    pdClear(); // Clear the previous position
+
     if (MouseImage != NULL) {
         Width  = ((State.X + MouseImage->Width)  > ScreenW)
             ? ScreenW - State.X : MouseImage->Width;
@@ -576,9 +599,14 @@ VOID pdDraw (VOID) {
 VOID pdClear (VOID) {
     #if REFIT_DEBUG > 0
     CHAR16 *MsgStr;
-
     static BOOLEAN NotLogged = TRUE;
     #endif
+
+    // --- Added Debug Log ---
+    #if REFIT_DEBUG > 1 // Use loglevel2
+    LOG_MSG("pdClear: Clearing at LastXPos=%d, LastYPos=%d\n", LastXPos, LastYPos);
+    #endif
+    // --- End Debug Log ---
 
 
     if (!MouseTouchActive) {

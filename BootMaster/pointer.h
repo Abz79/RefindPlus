@@ -24,7 +24,7 @@
  *
  * Modifications distributed under the preceding terms.
  */
-
+extern BOOLEAN gSuppressPointerDraw;
 #ifndef __REFINDPLUS_POINTERDEVICE_H_
 #define __REFINDPLUS_POINTERDEVICE_H_
 
