@@ -4551,5 +4551,5 @@ BOOLEAN GetMenuEntryYesNo (
     MenuEntryNo->Tag   = TAG_NO;
     AddMenuEntry (*Screen, MenuEntryNo);
 
-    return TRUE;/*/*/
+    return TRUE;
 } // BOOLEAN GetMenuEntryYesNo()
