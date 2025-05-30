@@ -2232,7 +2232,7 @@ LOADER_ENTRY * AddLoaderEntry (
     TmpName               = (DisplayName != NULL) ? DisplayName : Volume->VolName;
     LoaderEntry->me.Title = (DisplayName != NULL || Volume->VolName != NULL)
         ? PoolPrint (
-            L"Load %s%s%s%s%s",
+            L"Boot %s%s%s%s%s",
             LoaderEntry->Title,
             SetVolJoin (LoaderEntry->Title, TRUE                   ),
             SetVolKind (LoaderEntry->Title, TmpName, Volume->FSType),
@@ -2240,7 +2240,7 @@ LOADER_ENTRY * AddLoaderEntry (
             SetVolType (LoaderEntry->Title, TmpName, Volume->FSType)
         )
         : PoolPrint (
-            L"Load %s",
+            L"Boot %s",
             (LoaderTitle != NULL) ? LoaderTitle : LoaderPath
         );
 
@@ -5162,7 +5162,7 @@ VOID ScanForTools (VOID) {
                     FoundTool = TRUE;
 
                     MenuEntryPreCleanNvram->Title = PoolPrint (
-                        L"Show '%s' Menu", ToolName
+                        L"%s", ToolName
                     );
                     MenuEntryPreCleanNvram->Tag         = TAG_CLEAN_NVRAM;
                     MenuEntryPreCleanNvram->Row         = 1;
@@ -5281,7 +5281,7 @@ VOID ScanForTools (VOID) {
                     FoundTool = TRUE;
 
                     MenuEntryAbout->Title = PoolPrint (
-                        L"Show '%s' Menu", ToolName
+                        L"%s", ToolName
                     );
                     MenuEntryAbout->Tag         = TAG_ABOUT;
                     MenuEntryAbout->Row         =  1;
@@ -5385,7 +5385,7 @@ VOID ScanForTools (VOID) {
                     }
 
                     MenuEntryHiddenTags->Title = PoolPrint (
-                        L"Show '%s' Menu", ToolName
+                        L"%s", ToolName
                     );
                     MenuEntryHiddenTags->Tag         = TAG_HIDDEN;
                     MenuEntryHiddenTags->Row         = 1;
@@ -5482,7 +5482,7 @@ VOID ScanForTools (VOID) {
                     FoundTool = TRUE;
 
                     MenuEntryPreShellEFI->Title = PoolPrint (
-                        L"Show '%s' Menu", ToolName
+                        L"%s", ToolName
                     );
                     MenuEntryPreShellEFI->Tag         = TAG_SHELL;
                     MenuEntryPreShellEFI->Row         = 1;
@@ -5523,7 +5523,7 @@ VOID ScanForTools (VOID) {
                     FoundTool = TRUE;
 
                     MenuEntryPreGPTSync->Title = PoolPrint (
-                        L"Show '%s' Menu", ToolName
+                        L"%s", ToolName
                     );
                     MenuEntryPreGPTSync->Tag         = TAG_GPTSYNC;
                     MenuEntryPreGPTSync->Row         = 1;
@@ -5564,7 +5564,7 @@ VOID ScanForTools (VOID) {
                     FoundTool = TRUE;
 
                     MenuEntryPreGDiskTool->Title = PoolPrint (
-                        L"Show '%s' Menu", ToolName
+                        L"%s", ToolName
                     );
                     MenuEntryPreGDiskTool->Tag         = TAG_GDISK;
                     MenuEntryPreGDiskTool->Row         = 1;
@@ -5605,7 +5605,7 @@ VOID ScanForTools (VOID) {
                     FoundTool = TRUE;
 
                     MenuEntryPreMokTool->Title = PoolPrint (
-                        L"Show '%s' Menu", ToolName
+                        L"%s", ToolName
                     );
                     MenuEntryPreMokTool->Tag         = TAG_MOK;
                     MenuEntryPreMokTool->Row         = 1;
@@ -5646,7 +5646,7 @@ VOID ScanForTools (VOID) {
                     FoundTool = TRUE;
 
                     MenuEntryPreFwUpdateTool->Title = PoolPrint (
-                        L"Show '%s' Menu", ToolName
+                        L"%s", ToolName
                     );
                     MenuEntryPreFwUpdateTool->Tag         = TAG_FWUPDATE;
                     MenuEntryPreFwUpdateTool->Row         = 1;
@@ -5687,7 +5687,7 @@ VOID ScanForTools (VOID) {
                     FoundTool = TRUE;
 
                     MenuEntryPreNetBoot->Title = PoolPrint (
-                        L"Show '%s' Menu", ToolName
+                        L"%s", ToolName
                     );
                     MenuEntryPreNetBoot->Tag         = TAG_NETBOOT;
                     MenuEntryPreNetBoot->Row         = 1;
@@ -5727,7 +5727,7 @@ VOID ScanForTools (VOID) {
                     FoundTool = TRUE;
 
                     MenuEntryPreRecoveryMac->Title = PoolPrint (
-                        L"Show '%s' Menu", ToolName
+                        L"%s", ToolName
                     );
                     MenuEntryPreRecoveryMac->Tag         = TAG_RECOVERY_MAC;
                     MenuEntryPreRecoveryMac->Row         = 1;
@@ -5768,7 +5768,7 @@ VOID ScanForTools (VOID) {
                     FoundTool = TRUE;
 
                     MenuEntryPreRecoveryWin->Title = PoolPrint (
-                        L"Show '%s' Menu", ToolName
+                        L"%s", ToolName
                     );
                     MenuEntryPreRecoveryWin->Tag         = TAG_RECOVERY_WIN;
                     MenuEntryPreRecoveryWin->Row         = 1;
@@ -5864,7 +5864,7 @@ VOID ScanForTools (VOID) {
                 }
 
                 MenuEntryRotateCSR->Title = PoolPrint (
-                    L"Show '%s' Menu", ToolName
+                    L"%s", ToolName
                 );
                 MenuEntryRotateCSR->Tag         = TAG_CSR_ROTATE;
                 MenuEntryRotateCSR->Row         = 1;
@@ -5926,7 +5926,7 @@ VOID ScanForTools (VOID) {
                 }
 
                 MenuEntryBootOrder->Title = PoolPrint (
-                    L"Show '%s' Menu", ToolName
+                    L"%s", ToolName
                 );
                 MenuEntryBootOrder->Tag         = TAG_BOOTORDER;
                 MenuEntryBootOrder->Row         = 1;
@@ -5954,7 +5954,7 @@ VOID ScanForTools (VOID) {
                     FoundTool = TRUE;
 
                     MenuEntryPreMemTest->Title = PoolPrint (
-                        L"Show '%s' Menu", ToolName
+                        L"%s", ToolName
                     );
                     MenuEntryPreMemTest->Tag         = TAG_MEMTEST;
                     MenuEntryPreMemTest->Row         = 1;

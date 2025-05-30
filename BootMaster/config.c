@@ -1111,8 +1111,8 @@ LOADER_ENTRY * InitializeStanza (
     );
 
     StanzaEntry->Title = (Title != NULL)
-        ? PoolPrint (L"Manual Stanza: %s", Title)
-        : StrDuplicate (L"Manual Stanza: Title *NOT* Found");
+        ? PoolPrint (L"%s", Title)
+        : StrDuplicate (L"Title *NOT* Found");
     StanzaEntry->me.Row        = 0;
     StanzaEntry->Enabled       = TRUE;
     StanzaEntry->Volume        = CurrentVolume;
