@@ -4704,12 +4704,23 @@ EFI_STATUS EFIAPI efi_main (
             LOG_MSG("\n\n");
             MY_FREE_POOL(MsgStr);
             #endif
-
-            TypeStr = L"Aborted Invalid System Reset Call ... Please Try Again";
-            egDisplayMessage (
-                TypeStr, &BGColorFail,
-                CENTER, 4, L"PauseSeconds"
-            );
+            // Perform necessary cleanup before reset (e.g., closing open file handles)
+              // Ensure UninitRefitLib() is accessible and performs relevant cleanup.
+              UninitRefitLib();
+              // Perform the cold reset.
+              // This uses the wrapper defined in your project (likely in global.h or lib.h)
+              REFIT_CALL_4_WRAPPER(
+                  gRT->ResetSystem,
+                  EfiResetCold,  // Reset Type: Equivalent to pressing power/reset button
+                  EFI_SUCCESS,   // Status code to pass to the firmware
+                  0,             // Size of optional data buffer
+                  NULL           // Optional data buffer
+              );
+    //        TypeStr = L"Aborted Invalid System Reset Call ... Please Try Again";
+    //        egDisplayMessage (
+    //            TypeStr, &BGColorFail,
+    //            CENTER, 4, L"PauseSeconds"
+    //        );
 
             continue;
         }
