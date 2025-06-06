@@ -1263,7 +1263,7 @@ UINTN DrawMenuScreen (
             PointerActive      = FALSE; // Key press takes precedence over pointer activity for input handling
             DrawSelection      =  TRUE;
             PreviousPointerPressed = FALSE; // Reset pointer pressed state on key input
-            
+            pdClear();
             
             // React to key press (setting MenuExit)
             switch (key.ScanCode) {

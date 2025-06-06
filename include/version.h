@@ -16,4 +16,4 @@
  * Modifications distributed under the preceding terms.
  */
 
-#define REFINDPLUS_VERSION L"0.14.2.AC (ABZ-MOD-MouseFix)"
+#define REFINDPLUS_VERSION L"0.14.3 (ABZ-MOD-MouseFix)"
