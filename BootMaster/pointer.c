@@ -152,7 +152,8 @@ VOID pdInitialize (VOID) {
                     );
                     if (!EFI_ERROR(Status)) {
                         NumAPointerDevices++;
-
+                        // NEW: Add a small delay here if needed for absolute pointers (e.g., touchscreens)
+                        REFIT_CALL_1_WRAPPER(gBS->Stall, 5 * 1000); // 5 milliseconds (5000 microseconds)
                         #if REFIT_DEBUG > 0
                         EnableStatusTouch = EFI_SUCCESS;
                         #endif
@@ -209,7 +210,8 @@ VOID pdInitialize (VOID) {
                     );
                     if (!EFI_ERROR(Status)) {
                         NumSPointerDevices += 1;
-
+                        // NEW: Add a small delay after successfully opening the protocol for each simple pointer device
+                        REFIT_CALL_1_WRAPPER(gBS->Stall, 5 * 1000); // 5 milliseconds (5000 microseconds)
                         #if REFIT_DEBUG > 0
                         EnableStatusMouse = EFI_SUCCESS;
                         #endif
@@ -239,9 +241,8 @@ VOID pdInitialize (VOID) {
     #endif
 
     // Load mouse icon
-    if (NumAPointerDevices > 0 ||
-        NumSPointerDevices > 0
-    ) {
+    if (NumAPointerDevices > 0 || NumSPointerDevices > 0) {
+        REFIT_CALL_1_WRAPPER(gBS->Stall, 500000); // 500,000 microseconds = 0.5 seconds
         if (GlobalConfig.EnableMouse) {
             MouseImage = BuiltinIcon (BUILTIN_ICON_MOUSE);
         }
@@ -455,107 +456,143 @@ EFI_STATUS pdUpdateState (VOID) {
     BOOLEAN                    LastHolding;
     EFI_SIMPLE_POINTER_STATE   SPointerState;
     EFI_ABSOLUTE_POINTER_STATE APointerState;
-
-
-    #if defined (EFI32) && defined (__MAKEWITH_GNUEFI)
+    
+#if defined (EFI32) && defined (__MAKEWITH_GNUEFI)
     return EFI_NOT_READY;
-    #endif
-
+#endif
+    
     if (!PointerAvailable) {
         return EFI_NOT_READY;
     }
-
+    
+    // NEW: Gating check for MouseTouchActive: If pointer system isn't deemed "active",
+    // don't try to get state. This is crucial for stability.
+    if (!MouseTouchActive) {
+        return EFI_NOT_READY; // Return that no state is ready if not active
+    }
+    
+    // NEW: Get EFI Revision information
+    UINT32 EfiRevision = gST->Hdr.Revision;
+    UINTN EfiMajorVersion = EfiRevision >> 16;
+    UINTN EfiMinorVersion = EfiRevision & ((1 << 16) - 1);
+    
+    // NEW: Determine if a stall is needed based on EFI Revision (< 2.40)
+    BOOLEAN AddStall = FALSE;
+    // Check if EFI Revision is less than 2.40
+    // If Major < 2, or
+    // If Major == 2 AND Minor < 40
+    if (EfiMajorVersion < 2 || (EfiMajorVersion == 2 && EfiMinorVersion < 40)) {
+        AddStall = TRUE;
+    }
+    
+    // NEW: Determine the stall time based on the EFI Revision
+    UINTN StallTime = 0;
+    if (AddStall) {
+        StallTime = 5 * 1000; // 5 milliseconds (5000 microseconds)
+    }
+    // Else, StallTime remains 0, meaning no stall will be applied
+    
     LastHolding = State.Holding;
-
+    Status = EFI_NOT_READY; // Initialize status to NOT_READY before trying to get state
+    
     do {
         for (Index = 0; Index < NumAPointerDevices; Index++) {
-            Status = REFIT_CALL_2_WRAPPER(
-                ProtocolA[Index]->GetState,
-                ProtocolA[Index], &APointerState
-            );
-            if (EFI_ERROR(Status)) {
-                continue; // 'for' loop
+            EFI_STATUS PointerStatus = REFIT_CALL_2_WRAPPER(
+                                                            ProtocolA[Index]->GetState,
+                                                            ProtocolA[Index], &APointerState
+                                                            );
+            // if new state found and we haven't already found a new state
+            if (!EFI_ERROR(PointerStatus) && EFI_ERROR(Status)) {
+                Status = EFI_SUCCESS;
+                TempUINT64 = DivU64x64Remainder (
+                                                 (UINT64) APointerState.CurrentX *
+                                                 (UINT64) ScreenW,
+                                                 (UINT64) ProtocolA[Index]->Mode->AbsoluteMaxX,
+                                                 NULL
+                                                 );
+                State.X = Uint64ToUintn (TempUINT64);
+                TempUINT64 = DivU64x64Remainder (
+                                                 (UINT64) APointerState.CurrentY *
+                                                 (UINT64) ScreenH,
+                                                 (UINT64) ProtocolA[Index]->Mode->AbsoluteMaxY,
+                                                 NULL
+                                                 );
+                State.Y = Uint64ToUintn (TempUINT64);
+                
+                State.Holding = (
+                                 APointerState.ActiveButtons & EFI_ABSP_TouchActive
+                                 );
+            } else if (PointerStatus == EFI_NOT_READY) { // NEW: Apply stall only if AddStall is TRUE (i.e., revision < 2.40)
+                if (StallTime > 0) {
+                    REFIT_CALL_1_WRAPPER(gBS->Stall, StallTime);
+                }
             }
-
-            TempUINT64 = DivU64x64Remainder (
-                (UINT64) APointerState.CurrentX *
-                (UINT64) ScreenW,
-                (UINT64) ProtocolA[Index]->Mode->AbsoluteMaxX,
-                NULL
-            );
-            State.X = Uint64ToUintn (TempUINT64);
-
-            TempUINT64 = DivU64x64Remainder (
-                (UINT64) APointerState.CurrentY *
-                (UINT64) ScreenH,
-                (UINT64) ProtocolA[Index]->Mode->AbsoluteMaxY,
-                NULL
-            );
-            State.Y = Uint64ToUintn (TempUINT64);
-
-            State.Holding = (
-                APointerState.ActiveButtons & EFI_ABSP_TouchActive
-            );
-
-            break; // 'for' loop
-        } // for
-
-        if (!EFI_ERROR(Status)) {
-            break; // 'do' loop
-        }
-
+            // Original 'break;' removed here as it was for the outer 'do' loop's purpose.
+            // We want to process all devices if needed, but only update State if a new state is found.
+            // The logic '&& EFI_ERROR(Status)' ensures only the first successful GetState updates the State.
+        } // for APointerDevices
+        
+        // The original `if (!EFI_ERROR(Status)) { break; }` was for the `do { ... } while(0)` loop
+        // which effectively just ran once. This structure is being retained for minimal disruption.
+        
         for (Index = 0; Index < NumSPointerDevices; Index++) {
-            Status = REFIT_CALL_2_WRAPPER(
-                ProtocolS[Index]->GetState,
-                ProtocolS[Index], &SPointerState
-            );
-            if (EFI_ERROR(Status)) {
-                continue; // 'for' loop
+            EFI_STATUS PointerStatus = REFIT_CALL_2_WRAPPER(
+                                                            ProtocolS[Index]->GetState,
+                                                            ProtocolS[Index], &SPointerState
+                                                            );
+            // if new state found and we haven't already found a new state
+            if (!EFI_ERROR(PointerStatus) && EFI_ERROR(Status)) {
+                Status = EFI_SUCCESS;
+                TempINT64 = (INT64) State.X + DivS64x64Remainder (
+                                                                  (INT64) SPointerState.RelativeMovementX *
+                                                                  (INT64) GlobalConfig.MouseSpeed,
+                                                                  (INT64) ProtocolS[Index]->Mode->ResolutionX,
+                                                                  NULL
+                                                                  );
+                TargetX = Int64ToInt32 (TempINT64);
+                TempINT64 = (INT64) State.Y + DivS64x64Remainder (
+                                                                  (INT64) SPointerState.RelativeMovementY *
+                                                                  (INT64) GlobalConfig.MouseSpeed,
+                                                                  (INT64) ProtocolS[Index]->Mode->ResolutionY,
+                                                                  NULL
+                                                                  );
+                TargetY = Int64ToInt32 (TempINT64);
+                
+                TempINT64 = ScreenW - 1;
+                if (0);
+                else if (TargetX < 0)        State.X = 0;
+                else if (TargetX >= ScreenW) State.X = Int64ToUintn (TempINT64);
+                else                         State.X = Int32ToUintn (TargetX);
+                TempINT64 = ScreenH - 1;
+                if (0);
+                else if (TargetY < 0)        State.Y = 0;
+                else if (TargetY >= ScreenH) State.Y = Int64ToUintn (TempINT64);
+                else                         State.Y = Int32ToUintn (TargetY);
+                State.Holding = SPointerState.LeftButton;
+                
+            } else if (PointerStatus == EFI_NOT_READY) { // NEW: Apply stall only if AddStall is TRUE (i.e., revision < 2.40)
+                if (StallTime > 0) {
+                    REFIT_CALL_1_WRAPPER(gBS->Stall, StallTime);
+                }
             }
-
-            TempINT64 = (INT64) State.X + DivS64x64Remainder (
-                (INT64) SPointerState.RelativeMovementX *
-                (INT64) GlobalConfig.MouseSpeed,
-                (INT64) ProtocolS[Index]->Mode->ResolutionX,
-                NULL
-            );
-            TargetX = Int64ToInt32 (TempINT64);
-
-            TempINT64 = (INT64) State.Y + DivS64x64Remainder (
-                (INT64) SPointerState.RelativeMovementY *
-                (INT64) GlobalConfig.MouseSpeed,
-                (INT64) ProtocolS[Index]->Mode->ResolutionY,
-                NULL
-            );
-            TargetY = Int64ToInt32 (TempINT64);
-
-            TempINT64 = ScreenW - 1;
-            if (0);
-            else if (TargetX < 0)        State.X = 0;
-            else if (TargetX >= ScreenW) State.X = Int64ToUintn (TempINT64);
-            else                         State.X = Int32ToUintn (TargetX);
-
-            TempINT64 = ScreenH - 1;
-            if (0);
-            else if (TargetY < 0)        State.Y = 0;
-            else if (TargetY >= ScreenH) State.Y = Int64ToUintn (TempINT64);
-            else                         State.Y = Int32ToUintn (TargetY);
-
-            State.Holding = SPointerState.LeftButton;
-
-            break; // 'for' loop
-        } // for
-    } while (0); // This 'loop' only runs once
-
-    State.Press = (LastHolding && !State.Holding);
+            // Original 'break;' removed here as it was for the outer 'do' loop's purpose.
+            // We want to process all devices if needed, but only update State if a new state is found.
+            // The logic '&& EFI_ERROR(Status)' ensures only the first successful GetState updates the State.
+        } // for SPointerDevices
+    } while (0); // This 'loop' only runs once, retaining original structure
+    
+    State.Press = (LastHolding && !State.Holding); // Original line, keeping for now as per your request
+    
     if (State.X != LastXPos || State.Y != LastYPos) { // Mouse has moved
         if (gSuppressPointerDraw) { // If pointer was suppressed (hidden)
-            gSuppressPointerDraw = FALSE; }// Show the pointer
+            gSuppressPointerDraw = FALSE; // Show the pointer
         }
-    if (EFI_ERROR(Status)) {
-        Status = EFI_NOT_READY;
     }
-
+    
+    if (EFI_ERROR(Status)) {
+        Status = EFI_NOT_READY; // Original line, keeping for now as per your request
+    }
+    
     return Status;
 } // EFI_STATUS pdUpdateState()
 
