@@ -2175,6 +2175,7 @@ UINTN DrawMenuScreen (
     BOOLEAN                     UserKeyScan;
     BOOLEAN                     UserKeyPress;
     BOOLEAN                     WaitForRelease;
+    BOOLEAN                     PreviousPointerPressed = FALSE;
     INTN                        TimeoutCountdown;
     INTN                        TimeSinceKeystroke;
     INTN                        PreviousTime;
@@ -2219,7 +2220,7 @@ UINTN DrawMenuScreen (
     }
     else {
         HaveTimeout = TRUE;
-        TimeoutCountdown = Screen->TimeoutSeconds * 10;
+        TimeoutCountdown = Screen->TimeoutSeconds * 1122; // use new timer calculation based on the new delay
     }
 
     StyleFunc (Screen, &State, MENU_FUNCTION_INIT, NULL);
@@ -2430,7 +2431,7 @@ UINTN DrawMenuScreen (
         }
 
         if (HaveTimeout) {
-            CurrentTime = (TimeoutCountdown + 5) / 10;
+            CurrentTime = (TimeoutCountdown + 5) / 1122; // use same timer calculated number to display in seconds
             if (CurrentTime != PreviousTime) {
                TimeoutMessage = PoolPrint (
                    L"%s in %d Seconds",
@@ -2473,15 +2474,18 @@ UINTN DrawMenuScreen (
         else if (!EFI_ERROR(PointerStatus)) {
             PointerActive      = TRUE;
             TimeSinceKeystroke =    0;
+            POINTER_STATE CurrentPointerState = pdGetState(); // Capture the current state
 
-            if (StyleFunc != MainMenuStyle && pdGetState().Press) {
-                // Exit all submenus on pointer click.
-                // These return to main menu by default.
-                MenuExit = MENU_EXIT_ENTER;
-
-                break;
-            }
-        }
+                    // Click detection logic
+                    if (!PreviousPointerPressed && CurrentPointerState.Press) {
+                        if (StyleFunc != MainMenuStyle && State.CurrentSelection >= 0 &&
+                            Screen->Entries[State.CurrentSelection]->Tag == TAG_RETURN) { // If it's a return entry
+                            MenuExit = MENU_EXIT_ENTER; // Treat as enter
+                        }
+                    }
+                    // Update PreviousPointerPressed for the next iteration
+                    PreviousPointerPressed = CurrentPointerState.Holding;
+                }
         else {
             if (HaveTimeout      &&
                 TimeoutCountdown == 0
@@ -2498,15 +2502,10 @@ UINTN DrawMenuScreen (
                 break;
             }
 
-            if (!HaveTimeout &&
-                GlobalConfig.ScreensaverTime < 1
-            ) {
-                /* coverity[check_return: SUPPRESS] */
-                WaitForInput (0);
-            }
+
             else {
                 ElapsCount =                   1;
-                Input      = WaitForInput (1000); // 1s Timeout
+                Input      = Input = INPUT_TIMEOUT; // removed 1 sec Timeout to remove blocking
 
                 if (Input == INPUT_KEY ||
                     Input == INPUT_POINTER
@@ -4529,6 +4528,7 @@ UINTN RunMainMenu (
 
         BREAD_CRUMB(L"%a:  9a 6 - DO LOOP:- END", __func__);
         LOG_SEP(L"X");
+        REFIT_CALL_1_WRAPPER(gBS->Stall, 15000); // Add a 15ms delay for consistent frame rate and to fix click detection on old firmware
     } while (MenuExit == MENU_EXIT_ZERO);
 
     // Ignore MenuExit if FlushFailedTag is set and not previously reset
