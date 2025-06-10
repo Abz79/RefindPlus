@@ -2359,11 +2359,14 @@ BOOLEAN ShowInfoShell (
     } while (0); // This 'loop' only runs once
 
     RunOnce = TRUE;
-
-    return HandleToolSelection (
-        ToolInfoMenu, ReturnEntryItem,
-        (LOADER_ENTRY ***) &ShellEntryItems
-    );
+   /* return HandleToolSelection (
+   ToolInfoMenu, ReturnEntryItem,Add commentMore actions
+   (LOADER_ENTRY ***) &ShellEntryItems
+    ); */
+    if (ShellEntryItemsCount > 0) {
+        StartTool((LOADER_ENTRY*)ShellEntryItems[0]); // Direct executionAdd commentMore actions
+        return TRUE;
+      }
 } // static BOOLEAN ShowInfoShell()
 
 static
@@ -3633,10 +3636,10 @@ VOID ResetCall (
     #endif
 
 
-    egDisplayMessage (
+   /* egDisplayMessage (
         TypeStr, &BGColorBase,
         CENTER, 3, L"PauseSeconds"
-    );
+    ); */
 
     #if REFIT_DEBUG > 0
     MsgStr = (IsRestart)

@@ -498,64 +498,66 @@ EFI_STATUS pdUpdateState (VOID) {
     do {
         for (Index = 0; Index < NumAPointerDevices; Index++) {
             EFI_STATUS PointerStatus = REFIT_CALL_2_WRAPPER(
-                                                            ProtocolA[Index]->GetState,
-                                                            ProtocolA[Index], &APointerState
-                                                            );
+            ProtocolA[Index]->GetState,
+            ProtocolA[Index], &APointerState
+            );
             // if new state found and we haven't already found a new state
             if (!EFI_ERROR(PointerStatus) && EFI_ERROR(Status)) {
                 Status = EFI_SUCCESS;
                 TempUINT64 = DivU64x64Remainder (
-                                                 (UINT64) APointerState.CurrentX *
-                                                 (UINT64) ScreenW,
-                                                 (UINT64) ProtocolA[Index]->Mode->AbsoluteMaxX,
-                                                 NULL
-                                                 );
+                (UINT64) APointerState.CurrentX *
+                (UINT64) ScreenW,
+                (UINT64) ProtocolA[Index]->Mode->AbsoluteMaxX,
+                NULL
+                );
                 State.X = Uint64ToUintn (TempUINT64);
                 TempUINT64 = DivU64x64Remainder (
-                                                 (UINT64) APointerState.CurrentY *
-                                                 (UINT64) ScreenH,
-                                                 (UINT64) ProtocolA[Index]->Mode->AbsoluteMaxY,
-                                                 NULL
-                                                 );
+                (UINT64) APointerState.CurrentY *
+                (UINT64) ScreenH,
+                (UINT64) ProtocolA[Index]->Mode->AbsoluteMaxY,
+                NULL
+                );
                 State.Y = Uint64ToUintn (TempUINT64);
                 
                 State.Holding = (
-                                 APointerState.ActiveButtons & EFI_ABSP_TouchActive
-                                 );
+                APointerState.ActiveButtons & EFI_ABSP_TouchActive
+                );
             } else if (PointerStatus == EFI_NOT_READY) { // NEW: Apply stall only if AddStall is TRUE (i.e., revision < 2.40)
                 if (StallTime > 0) {
                     REFIT_CALL_1_WRAPPER(gBS->Stall, StallTime);
                 }
             }
-            // Original 'break;' removed here as it was for the outer 'do' loop's purpose.
-            // We want to process all devices if needed, but only update State if a new state is found.
-            // The logic '&& EFI_ERROR(Status)' ensures only the first successful GetState updates the State.
         } // for APointerDevices
-        
-        // The original `if (!EFI_ERROR(Status)) { break; }` was for the `do { ... } while(0)` loop
-        // which effectively just ran once. This structure is being retained for minimal disruption.
         
         for (Index = 0; Index < NumSPointerDevices; Index++) {
             EFI_STATUS PointerStatus = REFIT_CALL_2_WRAPPER(
-                                                            ProtocolS[Index]->GetState,
-                                                            ProtocolS[Index], &SPointerState
-                                                            );
+            ProtocolS[Index]->GetState,
+            ProtocolS[Index], &SPointerState
+            );
+            // Add this DebugLog for Simple Pointer (USB Mouse)
+            #if REFIT_DEBUG > 0
+            if (GlobalConfig.LogLevel > 0) { // Log at a reasonable level (e.g., 1 or higher)
+                DebugLog(L"SPointer: Status=0x%llx, LeftButton=%d, RightButton=%d, RelativeX=%d, RelativeY=%d, State.Holding (pre-update)=%d\n",
+                         PointerStatus, SPointerState.LeftButton, SPointerState.RightButton,
+                         SPointerState.RelativeMovementX, SPointerState.RelativeMovementY, LastHolding);
+            }
+            #endif
             // if new state found and we haven't already found a new state
             if (!EFI_ERROR(PointerStatus) && EFI_ERROR(Status)) {
                 Status = EFI_SUCCESS;
                 TempINT64 = (INT64) State.X + DivS64x64Remainder (
-                                                                  (INT64) SPointerState.RelativeMovementX *
-                                                                  (INT64) GlobalConfig.MouseSpeed,
-                                                                  (INT64) ProtocolS[Index]->Mode->ResolutionX,
-                                                                  NULL
-                                                                  );
+                (INT64) SPointerState.RelativeMovementX *
+                (INT64) GlobalConfig.MouseSpeed,
+                (INT64) ProtocolS[Index]->Mode->ResolutionX,
+                NULL
+                );
                 TargetX = Int64ToInt32 (TempINT64);
                 TempINT64 = (INT64) State.Y + DivS64x64Remainder (
-                                                                  (INT64) SPointerState.RelativeMovementY *
-                                                                  (INT64) GlobalConfig.MouseSpeed,
-                                                                  (INT64) ProtocolS[Index]->Mode->ResolutionY,
-                                                                  NULL
-                                                                  );
+                (INT64) SPointerState.RelativeMovementY *
+                (INT64) GlobalConfig.MouseSpeed,
+                (INT64) ProtocolS[Index]->Mode->ResolutionY,
+                NULL
+                );
                 TargetY = Int64ToInt32 (TempINT64);
                 
                 TempINT64 = ScreenW - 1;
@@ -575,14 +577,11 @@ EFI_STATUS pdUpdateState (VOID) {
                     REFIT_CALL_1_WRAPPER(gBS->Stall, StallTime);
                 }
             }
-            // Original 'break;' removed here as it was for the outer 'do' loop's purpose.
-            // We want to process all devices if needed, but only update State if a new state is found.
-            // The logic '&& EFI_ERROR(Status)' ensures only the first successful GetState updates the State.
         } // for SPointerDevices
     } while (0); // This 'loop' only runs once, retaining original structure
-    
-    State.Press = (LastHolding && !State.Holding); // Original line, keeping for now as per your request
-    
+  
+        State.Press = (!LastHolding && State.Holding); // Detects a BUTTON PRESS (button just went up)
+
     if (State.X != LastXPos || State.Y != LastYPos) { // Mouse has moved
         if (gSuppressPointerDraw) { // If pointer was suppressed (hidden)
             gSuppressPointerDraw = FALSE; // Show the pointer
