@@ -39,6 +39,7 @@
 #include "../EfiLib/AbsolutePointer.h"
 #endif
 extern BOOLEAN gSuppressPointerDraw;
+extern BOOLEAN gPointerActuallyMoved;
 typedef struct PointerStateStruct {
     UINTN         X;
     UINTN         Y;
