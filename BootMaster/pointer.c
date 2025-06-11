@@ -53,6 +53,8 @@ POINTER_STATE                   State;
 
 extern BOOLEAN                  RunningOC;
 
+BOOLEAN gPointerActuallyMoved = FALSE;
+
 ////////////////////////////////////////////////////////////////////////////////
 // Initialise Pointer Devices
 ////////////////////////////////////////////////////////////////////////////////
@@ -455,7 +457,7 @@ EFI_STATUS pdUpdateState (VOID) {
     BOOLEAN                    LastHolding;
     EFI_SIMPLE_POINTER_STATE   SPointerState;
     EFI_ABSOLUTE_POINTER_STATE APointerState;
-
+    gPointerActuallyMoved = FALSE;
 
     #if defined (EFI32) && defined (__MAKEWITH_GNUEFI)
     return EFI_NOT_READY;
@@ -547,7 +549,11 @@ EFI_STATUS pdUpdateState (VOID) {
         } // for
     } while (0); // This 'loop' only runs once
 
-    State.Press = (LastHolding && !State.Holding);
+    State.Press = (!LastHolding && State.Holding); // Detects a BUTTON PRESS (button just went down)
+
+    if (State.X != LastXPos || State.Y != LastYPos) { // Mouse has moved
+        gPointerActuallyMoved = TRUE; // Set the flag to TRUE
+    }
 
     if (EFI_ERROR(Status)) {
         Status = EFI_NOT_READY;
@@ -574,7 +580,11 @@ VOID pdDraw (VOID) {
         return;
     }
 
-    MY_FREE_IMAGE(Background);
+    if (Background != NULL) {
+        egDrawImage (Background, LastXPos, LastYPos); // This draws the saved background over the old pointer
+        MY_FREE_IMAGE(Background); // Frees the OLD backgroundAdd commentMore actions
+        }
+
     if (MouseImage != NULL) {
         Width = (
             (State.X + MouseImage->Width) > ScreenW
