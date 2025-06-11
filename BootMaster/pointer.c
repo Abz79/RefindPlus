@@ -53,77 +53,7 @@ POINTER_STATE                   State;
 
 extern BOOLEAN                  RunningOC;
 
-
-////////////////////////////////////////////////////////////////////////////////
-// Frees allocated memory and closes pointer protocols
-////////////////////////////////////////////////////////////////////////////////
-static
-VOID pdCleanup (VOID) {
-    #if REFIT_DEBUG > 0
-    CHAR16 *MsgStr;
-    #endif
-
-    UINTN   Index;
-
-
-    #if REFIT_DEBUG > 0
-    MsgStr = L"Pointer Scenarios";
-    ALT_LOG(1, LOG_LINE_NORMAL, L"Dismantle %s", MsgStr);
-    LOG_MSG("Deconfigure %s:", MsgStr);
-    #endif
-
-    if (RunningOC) {
-        return;
-    }
-
-    pdClear (FALSE);
-
-    if (HandleA != NULL) {
-        for (Index = 0; Index < NumAPointerDevices; Index++) {
-            REFIT_CALL_4_WRAPPER(
-                gBS->CloseProtocol, HandleA[Index],
-                &APointerGuid, SelfImageHandle, NULL
-            );
-        }
-    }
-
-    if (HandleS != NULL) {
-        for (Index = 0; Index < NumSPointerDevices; Index++) {
-            REFIT_CALL_4_WRAPPER(
-                gBS->CloseProtocol, HandleS[Index],
-                &SPointerGuid, SelfImageHandle, NULL
-            );
-        }
-    }
-
-    LastXPos = (
-        ScreenW > 1
-    ) ? ScreenW / 2 : ScreenW;
-    LastYPos = (
-        ScreenH > 1
-    ) ? ScreenH / 2 : ScreenH;
-
-    State.X        = LastXPos;
-    State.Y        = LastYPos;
-    State.Press    =    FALSE;
-    State.Holding  =    FALSE;
-
-    NumAPointerDevices    = 0;
-    NumSPointerDevices    = 0;
-
-    #if REFIT_DEBUG > 0
-    MsgStr = L"Disable Pointer Protocols ... Success";
-    ALT_LOG(1, LOG_THREE_STAR_MID, L"%s", MsgStr);
-    LOG_MSG("%s  - %s", OffsetNext, MsgStr);
-    #endif
-
-    MY_FREE_POOL(HandleA);
-    MY_FREE_POOL(HandleS);
-    MY_FREE_POOL(ProtocolA);
-    MY_FREE_POOL(ProtocolS);
-    MY_FREE_IMAGE(MouseImage);
-} // static VOID pdCleanup()
-
+BOOLEAN gPointerActuallyMoved = FALSE;
 ////////////////////////////////////////////////////////////////////////////////
 // Initialise Pointer Devices
 ////////////////////////////////////////////////////////////////////////////////
@@ -487,7 +417,7 @@ EFI_STATUS pdUpdateState (VOID) {
     BOOLEAN                    LastHolding;
     EFI_SIMPLE_POINTER_STATE   SPointerState;
     EFI_ABSOLUTE_POINTER_STATE APointerState;
-
+    gPointerActuallyMoved = FALSE;
 
     Status = EFI_NOT_READY;
 
@@ -577,7 +507,11 @@ EFI_STATUS pdUpdateState (VOID) {
         } // for
     } while (0); // This 'loop' only runs once
 
-    State.Press = (LastHolding && !State.Holding);
+    State.Press = (!LastHolding && State.Holding); // Detects a BUTTON PRESS (button just went down)
+
+    if (State.X != LastXPos || State.Y != LastYPos) { // Mouse has moved
+        gPointerActuallyMoved = TRUE; // Set the flag to TRUE
+    }
 
     if (EFI_ERROR(Status)) {
         Status = EFI_NOT_READY;
@@ -607,13 +541,18 @@ VOID pdDraw (VOID) {
         return;
     }
 
-    Width = (
-        (State.X + MouseImage->Width) > ScreenW
-    ) ? ScreenW - State.X : MouseImage->Width;
-    Height = (
-        (State.Y + MouseImage->Height) > ScreenH
-    ) ? ScreenH - State.Y : MouseImage->Height;
+    if (Background != NULL) {
+        egDrawImage (Background, LastXPos, LastYPos); // This draws the saved background over the old pointer
+        MY_FREE_IMAGE(Background); // Frees the OLD backgroundAdd commentMore actions
+        }
 
+    if (MouseImage != NULL) {
+        Width = (
+            (State.X + MouseImage->Width) > ScreenW
+        ) ? ScreenW - State.X : MouseImage->Width;
+        Height = (
+            (State.Y + MouseImage->Height) > ScreenH
+        ) ? ScreenH - State.Y : MouseImage->Height;
     MY_FREE_IMAGE(Background);
     Background = egCopyScreenArea (
         State.X, State.Y,

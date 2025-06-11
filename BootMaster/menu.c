@@ -2175,10 +2175,9 @@ UINTN DrawMenuScreen (
     BOOLEAN                     UserKeyScan;
     BOOLEAN                     UserKeyPress;
     BOOLEAN                     WaitForRelease;
-    BOOLEAN                     PreviousPointerPressed = FALSE;
-    INTN                        TimeoutCountdown;
+    INTN                        TimeoutCountdown; // MODIFIED: This variable's purpose is changed to store ms time
     INTN                        TimeSinceKeystroke;
-    INTN                        PreviousTime;
+    INTN                        PreviousTime = -1; // MODIFIED: Initialize to a value that ensures initial display
     INTN                        CurrentTime;
     INTN                        ShortcutEntry;
     UINTN                       ElapsCount;
@@ -2220,7 +2219,7 @@ UINTN DrawMenuScreen (
     }
     else {
         HaveTimeout = TRUE;
-        TimeoutCountdown = Screen->TimeoutSeconds * 1122; // use new timer calculation based on the new delay
+        TimeoutCountdown = GetCurrentMS();
     }
 
     StyleFunc (Screen, &State, MENU_FUNCTION_INIT, NULL);
@@ -2405,7 +2404,9 @@ UINTN DrawMenuScreen (
                 State.PaintSelection = FALSE;
             }
         }
-        pdDraw();
+        if (gPointerActuallyMoved) {
+            pdDraw();
+            }
 
         // DA-TAG: Investigate This
         //         Toggle the selection once to work around failure to
@@ -2430,8 +2431,18 @@ UINTN DrawMenuScreen (
             }
         }
 
+        // MODIFIED LOGIC START for timeout countdown calculation
         if (HaveTimeout) {
-            CurrentTime = (TimeoutCountdown + 5) / 1122; // use same timer calculated number to display in seconds
+            UINTN CurrentMs = GetCurrentMS(); // NEW LOGIC: Get current milliseconds
+            UINTN ElapsedMs = CurrentMs - TimeoutCountdown; // NEW LOGIC: Calculate elapsed milliseconds since start
+            UINTN ElapsedSeconds = ElapsedMs / 1000; // NEW LOGIC: Convert to elapsed seconds
+
+            // Calculate remaining seconds
+            INTN RemainingSeconds = (INTN)Screen->TimeoutSeconds - (INTN)ElapsedSeconds;
+
+            CurrentTime = (RemainingSeconds >= 0) ? RemainingSeconds : 0; // MODIFIED: CurrentTime reflects actual remaining seconds
+
+            // Update message only if the displayed second value changes
             if (CurrentTime != PreviousTime) {
                TimeoutMessage = PoolPrint (
                    L"%s in %d Seconds",
@@ -2474,24 +2485,16 @@ UINTN DrawMenuScreen (
         else if (!EFI_ERROR(PointerStatus)) {
             PointerActive      = TRUE;
             TimeSinceKeystroke =    0;
-            POINTER_STATE CurrentPointerState = pdGetState(); // Capture the current state
 
-                    // Click detection logic
-                    if (!PreviousPointerPressed && CurrentPointerState.Press) {
-                        if (StyleFunc != MainMenuStyle && State.CurrentSelection >= 0 &&
-                            Screen->Entries[State.CurrentSelection]->Tag == TAG_RETURN) { // If it's a return entry
-                            MenuExit = MENU_EXIT_ENTER; // Treat as enter
-                        }
-                    }
-                    // Update PreviousPointerPressed for the next iteration
-                    PreviousPointerPressed = CurrentPointerState.Holding;
-                }
+            if (StyleFunc != MainMenuStyle && pdGetState().Press) {
+                // Prevent user from getting stuck on submenus
+                // Only 'About' screen currently reachable without keyboard
+                MenuExit = MENU_EXIT_ENTER;
+                break;
+            }
+        }
         else {
-            if (HaveTimeout      &&
-                TimeoutCountdown == 0
-            ) {
-                // Timeout expired
-                #if REFIT_DEBUG > 0
+            if (HaveTimeout && CurrentTime <= 0) { // CurrentTime is now the real RemainingSeconds                #if REFIT_DEBUG > 0
                 ALT_LOG(1, LOG_LINE_NORMAL,
                     L"Menu Timeout Expired:- '%d Seconds'",
                     Screen->TimeoutSeconds
@@ -2502,55 +2505,27 @@ UINTN DrawMenuScreen (
                 break;
             }
 
-
-            else {
-                ElapsCount =                   1;
-                Input      = Input = INPUT_TIMEOUT; // removed 1 sec Timeout to remove blocking
-
-                if (Input == INPUT_KEY ||
-                    Input == INPUT_POINTER
+            TimeSinceKeystroke += 10; // MODIFIED: Increment TimeSinceKeystroke by a fixed value (e.g., 10 "ticks" per second)
+            // Screensaver logic remains unchanged
+            if (!HaveTimeout) { // This means timeout is NOT active, so screensaver is primary
+                if (GlobalConfig.ScreensaverTime > 0 &&
+                    TimeSinceKeystroke > (GlobalConfig.ScreensaverTime * 10)
                 ) {
-                    TimeSinceKeystroke = 0;
-                    continue;
-                }
-
-                if (Input == INPUT_TIMEOUT) {
-                    // Always counted as is to end of the timeout
-                    ElapsCount = 10;
-                }
-
-                TimeSinceKeystroke += ElapsCount;
-                if (HaveTimeout) {
-                    TimeoutCountdown = (
-                        TimeoutCountdown > ElapsCount
-                    ) ? TimeoutCountdown - ElapsCount : 0;
-                }
-                else {
-                    if (GlobalConfig.ScreensaverTime > 0 &&
-                        TimeSinceKeystroke > (GlobalConfig.ScreensaverTime * 10)
-                    ) {
-                        SaveScreen();
-                        State.PaintAll     = TRUE;
-                        TimeSinceKeystroke =    0;
-
-                        if (!AllowGraphicsMode) {
-                            PrepareBlankLine();
-                            DrawScreenHeader (Screen->Title);
-                        }
+                    SaveScreen();
+                    State.PaintAll     = TRUE;
+                    TimeSinceKeystroke =    0;
+                    if (!AllowGraphicsMode) {
+                        PrepareBlankLine();
+                        DrawScreenHeader (Screen->Title);
                     }
                 }
-            } // if/else !HaveTimeout
-
+            }
             continue;
-        } // if/else !EFI_ERROR(Status)
+        } // MODIFIED LOGIC END for idle state
 
         if (HaveTimeout) {
-            // User pressed a key ... Cancel timeout
-            StyleFunc (
-                Screen, &State,
-                MENU_FUNCTION_PAINT_TIMEOUT, L""
-            );
-            HaveTimeout = FALSE;
+            // User pressed a key / moved pointer ... Cancel timeout
+            StyleFunc (Screen, &State, MENU_FUNCTION_PAINT_TIMEOUT, L"");            HaveTimeout = FALSE;
 
             if (GlobalConfig.ScreensaverTime == -1) {
                 // Cancel start-with-blank-screen coding
@@ -2734,7 +2709,6 @@ UINTN DrawMenuScreen (
                         ALT_LOG(1, LOG_LINE_NORMAL,
                             L"Process Pointer Event ... Arrow Left"
                         );
-                    }
                     #endif
 
                 break;

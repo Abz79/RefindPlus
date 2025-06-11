@@ -39,6 +39,8 @@
 #include "../EfiLib/AbsolutePointer.h"
 #endif
 
+extern BOOLEAN gPointerActuallyMoved;
+
 typedef struct PointerStateStruct {
     UINTN         X;
     UINTN         Y;
