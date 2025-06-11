@@ -2345,13 +2345,15 @@ UINTN DrawMenuScreen (
     UserKeyPress = UserKeyScan = Rotated = FALSE;
     while (MenuExit == MENU_EXIT_ZERO) {
         // Update the screen
-        pdClear();
+
         if (State.PaintAll && GlobalConfig.ScreensaverTime != -1) {
+            pdClear();
             StyleFunc (Screen, &State, MENU_FUNCTION_PAINT_ALL, NULL);
             State.PaintAll = FALSE;
         }
         else {
             if (State.PaintSelection) {
+                pdClear();
                 StyleFunc (Screen, &State, MENU_FUNCTION_PAINT_SELECTION, NULL);
                 State.PaintSelection = FALSE;
             }
