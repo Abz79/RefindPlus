@@ -46,7 +46,7 @@
  *
  * Modifications distributed under the preceding terms.
  */
-
+#include "pointer.h"
 #include "global.h"
 #include "menu.h"
 #include "icns.h"
@@ -108,7 +108,7 @@ UINTN      IconRowItems      = 0;
 BOOLEAN PointerEnabled       = FALSE;
 BOOLEAN PointerActive        = FALSE;
 BOOLEAN DrawSelection        =  TRUE;
-
+BOOLEAN PreviousPointerPressed = FALSE;
 BOOLEAN SubScreenBoot        = FALSE;
 
 REFIT_MENU_ENTRY MenuEntryNo = {
@@ -2344,8 +2344,8 @@ UINTN DrawMenuScreen (
     TimeSinceKeystroke                   =     0;
     UserKeyPress = UserKeyScan = Rotated = FALSE;
     while (MenuExit == MENU_EXIT_ZERO) {
-        // Update the screen
 
+        // Update the screen
         if (State.PaintAll && GlobalConfig.ScreensaverTime != -1) {
             pdClear();
             StyleFunc (Screen, &State, MENU_FUNCTION_PAINT_ALL, NULL);
@@ -2358,10 +2358,13 @@ UINTN DrawMenuScreen (
                 State.PaintSelection = FALSE;
             }
         }
-        if ((gPointerActuallyMoved) || (Screen->TimeoutSeconds > 0)) {
-            pdDraw();
-            }
 
+         // Check the new global flag
+            if (!gSuppressPointerDraw) {
+                if (gPointerActuallyMoved) {
+                pdDraw();
+            }
+        }
         // DA-TAG: Investigate This
         //         Toggle the selection once to work around failure to
         //         display the default selection on load in text mode.
@@ -2428,7 +2431,8 @@ UINTN DrawMenuScreen (
 
         Status = REFIT_CALL_2_WRAPPER(gST->ConIn->ReadKeyStroke, gST->ConIn, &key);
         if (!EFI_ERROR(Status)) {
-            pdDraw();
+            pdClear(); // hide the pointer when a key is pressed
+            gSuppressPointerDraw      =  TRUE;
             PointerActive      = FALSE;
             DrawSelection      =  TRUE;
             TimeSinceKeystroke =     0;

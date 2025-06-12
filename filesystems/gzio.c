@@ -281,7 +281,12 @@ static ush mask_bits[] =
 
 /* DA-TAG: Modified by Dayo Akanji (sf.net/u/dakanji/profile). 28 Nov 2021 */
 // Make conditional to remove Mac OS Clang compile warning
-#if !defined(__has_warning) || __has_warning("-Wunsafe-loop-optimizations")
+#ifdef __GNUC__
+#  ifndef __has_warning
+#    define __has_warning(x) 0
+#  endif
+#endif
+#if !defined(__GNUC__) && (!defined(__has_warning) || __has_warning("-Wunsafe-loop-optimizations"))
 #pragma GCC diagnostic ignored "-Wunsafe-loop-optimizations"
 #endif
 
