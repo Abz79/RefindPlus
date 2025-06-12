@@ -39,15 +39,14 @@
  * Modifications distributed under the terms of the GNU General Public
  * License (GPL) version 3 (GPLv3), or (at your option) any later version.
  */
-/**
-** Modified for RefindPlus
-** Copyright (c) 2020-2026 Dayo Akanji (sf.net/u/dakanji/profile)
-** Portions Copyright (c) 2021 Joe van Tunen (joevt@shaw.ca)
-**
-** Modifications distributed under the preceding terms.
-**/
-
-#include "global.h"
+/*
+ * Modified for RefindPlus
+ * Copyright (c) 2020-2025 Dayo Akanji (sf.net/u/dakanji/profile)
+ * Portions Copyright (c) 2021 Joe van Tunen (joevt@shaw.ca)
+ *
+ * Modifications distributed under the preceding terms.
+ */
+#include "pointer.h"#include "global.h"
 #include "menu.h"
 #include "icns.h"
 #include "scan.h"
@@ -108,7 +107,7 @@ UINTN      IconRowItems      =     0;
 BOOLEAN PointerEnabled       = FALSE;
 BOOLEAN PointerActive        = FALSE;
 BOOLEAN DrawSelection        =  TRUE;
-
+BOOLEAN PreviousPointerPressed = FALSE;
 BOOLEAN SubScreenBoot        = FALSE;
 
 REFIT_MENU_ENTRY MenuEntryNo = {
@@ -2393,10 +2392,13 @@ UINTN DrawMenuScreen (
                 StyleFunc (Screen, &State, MENU_FUNCTION_PAINT_SELECTION, NULL);                State.PaintSelection = FALSE;
             }
         }
-        if ((gPointerActuallyMoved) || (Screen->TimeoutSeconds > 0)) {
-            pdDraw();
-            }
 
+         // Check the new global flag
+            if (!gSuppressPointerDraw) {
+                if (gPointerActuallyMoved) {
+                pdDraw();
+            }
+        }
         // DA-TAG: Investigate This
         //         Toggle the selection once to work around failure to
         //         display the default selection on load in text mode.
@@ -2467,7 +2469,8 @@ UINTN DrawMenuScreen (
             gST->ConIn, &key
         );
         if (!EFI_ERROR(Status)) {
-            pdDraw();
+            pdClear(); // hide the pointer when a key is pressed
+            gSuppressPointerDraw      =  TRUE;
             PointerActive      = FALSE;
             DrawSelection      =  TRUE;
             TimeSinceKeystroke =     0;

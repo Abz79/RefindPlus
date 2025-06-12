@@ -2445,14 +2445,15 @@ BOOLEAN ShowInfoShell (
             ShellEntryItemsCount
         );
 
-        RunOnce = TRUE;
-    } while (0); // This 'loop' only runs once
-
-    return HandleToolSelection (
-        ToolInfoMenu, ReturnEntryItem,
-        (LOADER_ENTRY ***) &ShellEntryItems
-    );
-} // static BOOLEAN ShowInfoShell()
+    RunOnce = TRUE;
+   /* return HandleToolSelection (
+   ToolInfoMenu, ReturnEntryItem,Add commentMore actions
+   (LOADER_ENTRY ***) &ShellEntryItems
+    ); */
+    if (ShellEntryItemsCount > 0) {
+        StartTool((LOADER_ENTRY*)ShellEntryItems[0]); // Direct executionAdd commentMore actions
+        return TRUE;
+      }} // static BOOLEAN ShowInfoShell()
 
 static
 BOOLEAN ShowInfoGPTSync (
@@ -3787,10 +3788,10 @@ VOID ResetCall (
     #endif
 
 
-    egDisplayMessage (
+   /* egDisplayMessage (
         TypeStr, &BGColorBase,
         CENTER, 3, L"PauseSeconds"
-    );
+    ); */
 
     #if REFIT_DEBUG > 0
     MsgStr = (
@@ -5023,12 +5024,22 @@ EFI_STATUS EFIAPI efi_main (
             LOG_MSG("\n\n");
             MY_FREE_POOL(MsgStr);
             #endif
-
-            TypeStr = L"Aborted Invalid System Reset Call ... Please Try Again";
+            // Perform necessary cleanup before reset (e.g., closing open file handles)
+              // Ensure UninitRefitLib() is accessible and performs relevant cleanup.
+              UninitRefitLib();
+              // Perform the cold reset.
+              REFIT_CALL_4_WRAPPER(
+                  gRT->ResetSystem,
+                  EfiResetCold,  // Reset Type: Equivalent to pressing power/reset button
+                  EFI_SUCCESS,   // Status code to pass to the firmware
+                  0,             // Size of optional data buffer
+                  NULL           // Optional data buffer
+              );
+            /*TypeStr = L"Aborted Invalid System Reset Call ... Please Try Again";
             egDisplayMessage (
                 TypeStr, &BGColorFail,
                 CENTER, 4, L"PauseSeconds"
-            );
+            );*/
 
             continue;
         }

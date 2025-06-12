@@ -52,7 +52,7 @@ BOOLEAN                         PointerAvailable   =                            
 POINTER_STATE                   State;
 
 extern BOOLEAN                  RunningOC;
-
+BOOLEAN gSuppressPointerDraw = TRUE;
 BOOLEAN gPointerActuallyMoved = FALSE;
 ////////////////////////////////////////////////////////////////////////////////
 // Initialise Pointer Devices
@@ -508,9 +508,11 @@ EFI_STATUS pdUpdateState (VOID) {
     } while (0); // This 'loop' only runs once
 
     State.Press = (!LastHolding && State.Holding); // Detects a BUTTON PRESS (button just went down)
-
     if (State.X != LastXPos || State.Y != LastYPos) { // Mouse has moved
         gPointerActuallyMoved = TRUE; // Set the flag to TRUE
+        if (gSuppressPointerDraw) { // If pointer was suppressed (hidden)
+            gSuppressPointerDraw = FALSE; // Show the pointer
+        }
     }
 
     if (EFI_ERROR(Status)) {
@@ -541,10 +543,14 @@ VOID pdDraw (VOID) {
         return;
     }
 
+    if (gSuppressPointerDraw) {
+        return;
+    }
+
     if (Background != NULL) {
         egDrawImage (Background, LastXPos, LastYPos); // This draws the saved background over the old pointer
-        MY_FREE_IMAGE(Background); // Frees the OLD backgroundAdd commentMore actions
-        }
+        MY_FREE_IMAGE(Background); // Frees the OLD background
+    }
 
     if (MouseImage != NULL) {
         Width = (
