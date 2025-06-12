@@ -2358,7 +2358,7 @@ UINTN DrawMenuScreen (
                 State.PaintSelection = FALSE;
             }
         }
-        if (gPointerActuallyMoved) {
+        if ((gPointerActuallyMoved) || (Screen->TimeoutSeconds > 0)) {
             pdDraw();
             }
 
@@ -2428,6 +2428,7 @@ UINTN DrawMenuScreen (
 
         Status = REFIT_CALL_2_WRAPPER(gST->ConIn->ReadKeyStroke, gST->ConIn, &key);
         if (!EFI_ERROR(Status)) {
+            pdDraw();
             PointerActive      = FALSE;
             DrawSelection      =  TRUE;
             TimeSinceKeystroke =     0;
