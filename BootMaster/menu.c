@@ -2223,7 +2223,9 @@ UINTN DrawMenuScreen (
 
     StyleFunc (Screen, &State, MENU_FUNCTION_INIT, NULL);
     IdentifyRows (&State, Screen);
-
+    if (!gSuppressPointerDraw) {
+    pdDraw(); // Draw the pointer when menu loads or submenu exits
+    }
     // Override the starting selection with the default index, if any
     if (*DefaultEntryIndex == 9999) {
         *DefaultEntryIndex = State.MaxIndex;
@@ -2384,13 +2386,19 @@ UINTN DrawMenuScreen (
         // Update the screen
         if (State.PaintAll && GlobalConfig.ScreensaverTime != -1) {
             pdClear();
-            StyleFunc (Screen, &State, MENU_FUNCTION_PAINT_ALL, NULL);            State.PaintAll = FALSE;
-        }
+            StyleFunc (Screen, &State, MENU_FUNCTION_PAINT_ALL, NULL);
+            State.PaintAll = FALSE;
+            if (!gSuppressPointerDraw) {
+            pdDraw(); // Draw the pointer when returning from submenus
+            }        }
         else {
             if (State.PaintSelection) {
                 pdClear();
-                StyleFunc (Screen, &State, MENU_FUNCTION_PAINT_SELECTION, NULL);                State.PaintSelection = FALSE;
-            }
+                StyleFunc (Screen, &State, MENU_FUNCTION_PAINT_SELECTION, NULL);
+                State.PaintSelection = FALSE;
+                if (!gSuppressPointerDraw) {
+                pdDraw(); // Optional for returning from submenus
+                }            }
         }
 
          // Check the new global flag
