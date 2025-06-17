@@ -542,7 +542,7 @@ EFI_STATUS pdUpdateState (VOID) {
             else if (TargetY >= ScreenH) State.Y = Int64ToUintn (TempINT64);
             else                         State.Y = Int32ToUintn (TargetY);
 
-            State.Holding = SPointerState.LeftButton;
+            State.Holding = (SPointerState.LeftButton || SPointerState.RightButton);
 
             break; // 'for' loop
         } // for
