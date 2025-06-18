@@ -4136,17 +4136,16 @@ UINTN RunMainMenu (
     #endif
 
     // Remove any buffered key strokes
-    BREAD_CRUMB(L"%a:  4", __func__);
-//  KeyStrokeFound = ReadAllKeyStrokes();
+        BREAD_CRUMB(L"%a:  4", __func__);
+        KeyStrokeFound = ReadAllKeyStrokes();
 
     BREAD_CRUMB(L"%a:  5", __func__);
-    if (!AppleFirmware) {
-//    if (!KeyStrokeFound || !AppleFirmware) {
+    if (!KeyStrokeFound || !AppleFirmware) {
         BREAD_CRUMB(L"%a:  5a 1", __func__);
         if (!AppleFirmware) {
             // Always reset the buffer on UEFI PC
             BREAD_CRUMB(L"%a:  5a 1a 1", __func__);
-//          REFIT_CALL_2_WRAPPER(gST->ConIn->Reset, gST->ConIn, FALSE);
+            REFIT_CALL_2_WRAPPER(gST->ConIn->Reset, gST->ConIn, FALSE);
         }
         BREAD_CRUMB(L"%a:  5a 2", __func__);
     }
