@@ -4371,17 +4371,17 @@ UINTN RunMainMenu (
 
     // Remove buffered key strokes
     BREAD_CRUMB(L"%a:  4", __func__);
-    KeyStrokeFound = ReadAllKeyStrokes();
+//  KeyStrokeFound = ReadAllKeyStrokes();
 
     BREAD_CRUMB(L"%a:  5", __func__);
-    // NB: Buffer is always reset on UEFI PC
-    if (!KeyStrokeFound || !AppleFirmware) {
+    if (!AppleFirmware) {
+//    if (!KeyStrokeFound || !AppleFirmware) {
         BREAD_CRUMB(L"%a:  5a 1", __func__);
-        REFIT_CALL_2_WRAPPER(
-            gST->ConIn->Reset,
-            gST->ConIn, FALSE
-        );
-        BREAD_CRUMB(L"%a:  5a 2", __func__);
+        if (!AppleFirmware) {
+            // Always reset the buffer on UEFI PC
+            BREAD_CRUMB(L"%a:  5a 1a 1", __func__);
+//          REFIT_CALL_2_WRAPPER(gST->ConIn->Reset, gST->ConIn, FALSE);
+        }        BREAD_CRUMB(L"%a:  5a 2", __func__);
     }
 
     BREAD_CRUMB(L"%a:  6", __func__);
@@ -4394,7 +4394,8 @@ UINTN RunMainMenu (
         Style          = GraphicsMenuStyle;
         MainStyle      = MainMenuStyle;
         PointerEnabled = PointerActive = pdAvailable();
-        DrawSelection  = !PointerEnabled;
+        if (Screen->TimeoutSeconds > 0) {DrawSelection = !PointerEnabled;}
+        else {DrawSelection = TRUE;}
     }
 
     // Generate WaitList if not already generated
