@@ -2641,7 +2641,7 @@ UINTN DrawMenuScreen (
                     if (DrawSelection) {
                         DrawSelection        = FALSE;
                         State.PaintSelection =  TRUE;
-                        if PointerState.Press {
+                        if (PointerState.Press) {
                         gSuppressPointerDraw =  FALSE;
                         pdDraw();}
                     }
