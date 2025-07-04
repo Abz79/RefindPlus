@@ -4397,8 +4397,9 @@ UINTN RunMainMenu (
         Style          = GraphicsMenuStyle;
         MainStyle      = MainMenuStyle;
         PointerEnabled = PointerActive = pdAvailable();
-        if (Screen->TimeoutSeconds > 0) {DrawSelection = !PointerEnabled;}
-        else {DrawSelection = TRUE;}
+//        if (Screen->TimeoutSeconds > 0) {DrawSelection = !PointerEnabled;}
+//        else {DrawSelection = TRUE;}
+        DrawSelection = TRUE;
     }
 
     // Generate WaitList if not already generated
