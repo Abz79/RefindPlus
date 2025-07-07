@@ -78,7 +78,7 @@ VOID pdCleanup (VOID) {
         return;
     }
 
-    pdClear (FALSE);
+    pdClear();
 
     if (HandleA != NULL) {
         for (Index = 0; Index < NumAPointerDevices; Index++) {
@@ -459,11 +459,12 @@ UINTN Int64ToUintn (
     return (UINTN) TempINT64;
 } // static UINTN Int64ToUintn()
 
+/*
 static
 BOOLEAN pdNotUsed (VOID) {
     return (!PointerAvailable || !MouseTouchActive);
 } // static BOOLEAN pdNotUsed()
-
+*/
 EFI_STATUS pdUpdateState (VOID) {
     EFI_STATUS                 Status;
     UINTN                      Index;
@@ -476,7 +477,11 @@ EFI_STATUS pdUpdateState (VOID) {
     EFI_ABSOLUTE_POINTER_STATE APointerState;
     gPointerActuallyMoved = FALSE;
 
-    if (pdNotUsed()) {
+    #if defined (EFI32) && defined (__MAKEWITH_GNUEFI)
+    return EFI_NOT_READY;
+    #endif
+
+    if (!PointerAvailable) {
         return EFI_NOT_READY;
     }
 
@@ -591,8 +596,7 @@ VOID pdDraw (VOID) {
     UINTN Width;
     UINTN Height;
 
-
-    if (pdNotUsed()) {
+    if (!MouseTouchActive) {
         return;
     }
 
@@ -631,9 +635,7 @@ VOID pdDraw (VOID) {
 ////////////////////////////////////////////////////////////////////////////////
 // Restores the background at the position the mouse was last drawn
 ////////////////////////////////////////////////////////////////////////////////
-VOID pdClear (
-    BOOLEAN VetStatus
-) {
+VOID pdClear (VOID) {
     #if REFIT_DEBUG > 0
     CHAR16 *MsgStr;
 
@@ -641,9 +643,7 @@ VOID pdClear (
     #endif
 
 
-    if (VetStatus &&
-        pdNotUsed()
-    ) {
+    if (!MouseTouchActive) {
         return;
     }
 
