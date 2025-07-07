@@ -2775,12 +2775,8 @@ UINTN DrawMenuScreen (
         } // if/else !PointerActive
     } // while
 
-    pdClear (TRUE);
-    StyleFunc (
-        Screen, &State,
-        MENU_FUNCTION_CLEANUP, NULL
-    );
-
+    pdClear();
+    StyleFunc (Screen, &State, MENU_FUNCTION_CLEANUP, NULL);
     // Ignore MenuExit if FlushFailedTag is set and not previously reset
     if (FlushFailedTag && !FlushFailReset) {
         #if REFIT_DEBUG > 0
