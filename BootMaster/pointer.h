@@ -74,9 +74,7 @@ typedef struct PointerStateStruct {
 
 VOID pdInitialize (VOID);
 VOID pdDraw (VOID);
-VOID pdClear (
-    BOOLEAN VetStatus
-);
+VOID pdClear (VOID);
 
 UINTN pdCount (VOID);
 

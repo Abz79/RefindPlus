@@ -2478,7 +2478,7 @@ UINTN DrawMenuScreen (
             if (StyleFunc != MainMenuStyle && pdGetState().Press) {
                 // Prevent user from getting stuck on submenus
                 // Only 'About' screen currently reachable without keyboard
-                gSuppressPointerDraw      =  FALSE;
+                gSuppressPointerDraw = FALSE;
                 MenuExit = MENU_EXIT_ESCAPE;
                 break;
             }
@@ -2668,7 +2668,7 @@ UINTN DrawMenuScreen (
                         DrawSelection        = FALSE;
                         State.PaintSelection =  TRUE;
                         if (PointerState.Press) {
-                        gSuppressPointerDraw =  FALSE;
+                        gSuppressPointerDraw = FALSE;
                         pdDraw();}
                     }
                     else {
@@ -2756,7 +2756,7 @@ UINTN DrawMenuScreen (
         } // if/else !PointerActive
     } // while
 
-    pdClear (TRUE);
+    pdClear();
     StyleFunc (Screen, &State, MENU_FUNCTION_CLEANUP, NULL);
 
     // Ignore MenuExit if FlushFailedTag is set and not previously reset
@@ -4269,8 +4269,9 @@ UINTN RunMainMenu (
         Style          = GraphicsMenuStyle;
         MainStyle      = MainMenuStyle;
         PointerEnabled = PointerActive = pdAvailable();
-        if (Screen->TimeoutSeconds > 0) {DrawSelection = !PointerEnabled;}
-        else {DrawSelection = TRUE;}
+//        if (Screen->TimeoutSeconds > 0) {DrawSelection = !PointerEnabled;}
+//        else {DrawSelection = TRUE;}
+        DrawSelection = TRUE;
     }
 
     // Generate WaitList if not already generated
