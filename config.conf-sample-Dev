@@ -210,7 +210,7 @@
 #   Win   - Disable Bootlogo for Windows Loaders
 #   Lin   - Disable Bootlogo for Linux Stub Loaders
 #   All   - Disable Bootlogo for Every Type of Loader
-#   Off   - Disable Bootlogo for None of these Loaders (Default)
+#   Off   - Disable Bootlogo for None of These Loaders (Default)
 #
 # NOTES:
 # 1. The 'All' option takes precedence over others apart from 'Off'
@@ -327,7 +327,7 @@
 #
 #disable_set_applefb
 
-# Some computers, such as some classic MacPros, may have multiple GOP instances:
+# Some computers, such as classic MacPros, may have multiple GOP instances:
 #   - One installed on the Console Out handle
 #   - Others installed on GPU handles.
 # GOP on the Console Out Handle is what everything uses and is provided by
