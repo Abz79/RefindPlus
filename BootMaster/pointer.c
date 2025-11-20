@@ -98,7 +98,7 @@ VOID pdCleanup (VOID) {
 
     LastXPos = (
         ScreenW > 1
-    ) ? ScreenW / 2 : ScreenW;
+    ) ? ScreenW >> 2 : ScreenW;
     LastYPos = (
         ScreenH > 1
     ) ? ScreenH / 2 : ScreenH;
