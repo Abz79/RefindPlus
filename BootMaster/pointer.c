@@ -96,9 +96,12 @@ VOID pdCleanup (VOID) {
         }
     }
 
-    NumAPointerDevices = 0;
-    NumSPointerDevices = 0;
-
+    LastXPos = (
+        ScreenW > 1
+    ) ? ScreenW >> 2 : ScreenW;
+    LastYPos = (
+        ScreenH > 1
+    ) ? ScreenH / 2 : ScreenH;
     LastXPos = ScreenW / 2;
     LastYPos = ScreenH / 2;
 
