@@ -49,6 +49,8 @@ EG_IMAGE                       *Background         =                            
 
 BOOLEAN                         MouseTouchActive   =                               TRUE;
 BOOLEAN                         PointerAvailable   =                              FALSE;
+BOOLEAN                         gSuppressPointerDraw =                              TRUE;
+BOOLEAN                         gPointerActuallyMoved =                            FALSE;
 POINTER_STATE                   State;
 
 extern BOOLEAN                  RunningOC;
@@ -76,8 +78,7 @@ VOID pdCleanup (VOID) {
         return;
     }
 
-    pdClear();
-
+    pdClear ();
     if (HandleA != NULL) {
         for (Index = 0; Index < NumAPointerDevices; Index++) {
             REFIT_CALL_4_WRAPPER(
@@ -491,9 +492,15 @@ EFI_STATUS pdUpdateState (VOID) {
     return EFI_NOT_READY;
     #endif
 
-    if (!PointerAvailable) {
-        return EFI_NOT_READY;    }
+    Status = EFI_NOT_READY;
 
+    #if defined (EFI32) && defined (__MAKEWITH_GNUEFI)
+    return EFI_NOT_READY;
+    #endif
+
+    if (!PointerAvailable) {
+        return Status;
+    }
     LastHolding = State.Holding;
 
     do {
@@ -584,6 +591,13 @@ EFI_STATUS pdUpdateState (VOID) {
         }
     }
 
+    if (State.X != LastXPos || State.Y != LastYPos) {
+        gPointerActuallyMoved = TRUE;
+        if (gSuppressPointerDraw) {
+            gSuppressPointerDraw = FALSE;
+        }
+    }
+
     if (EFI_ERROR(Status)) {
         Status = EFI_NOT_READY;
     }
@@ -608,14 +622,17 @@ VOID pdDraw (VOID) {
     if (!MouseTouchActive) {        return;
     }
 
+    if (!MouseTouchActive) {
+        return;
+    }
+
     if (gSuppressPointerDraw) {
         return;
     }
 
     if (Background != NULL) {
-        egDrawImage (Background, LastXPos, LastYPos); // This draws the saved background over the old pointer
-        MY_FREE_IMAGE(Background); // Frees the OLD background
-    }
+        egDrawImage (Background, LastXPos, LastYPos);
+        MY_FREE_IMAGE(Background);    }
 
     if (MouseImage != NULL) {
         Width = (
@@ -638,6 +655,7 @@ VOID pdDraw (VOID) {
 
     LastXPos = State.X;
     LastYPos = State.Y;
+    gPointerActuallyMoved = FALSE;
 } // VOID pdDraw()
 
 ////////////////////////////////////////////////////////////////////////////////
