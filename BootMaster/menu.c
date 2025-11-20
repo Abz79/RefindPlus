@@ -2670,7 +2670,11 @@ UINTN DrawMenuScreen (
                         pdDraw();}
                     }
                     else {
-                        if (!PointerState.Press) {
+                        if (PointerState.Press) {
+                            gSuppressPointerDraw = FALSE;
+                            pdDraw();
+                        }
+                        else {
                             pdUpdateState();
                         }
                     }

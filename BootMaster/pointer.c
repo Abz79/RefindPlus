@@ -49,6 +49,8 @@ EG_IMAGE                       *Background         =                            
 
 BOOLEAN                         MouseTouchActive   =                               TRUE;
 BOOLEAN                         PointerAvailable   =                              FALSE;
+BOOLEAN                         gSuppressPointerDraw =                              TRUE;
+BOOLEAN                         gPointerActuallyMoved =                            FALSE;
 POINTER_STATE                   State;
 
 extern BOOLEAN                  RunningOC;
@@ -76,7 +78,7 @@ VOID pdCleanup (VOID) {
         return;
     }
 
-    pdClear (FALSE);
+    pdClear ();
 
     if (HandleA != NULL) {
         for (Index = 0; Index < NumAPointerDevices; Index++) {
@@ -472,10 +474,12 @@ UINTN Int64ToUintn (
     return (UINTN) TempINT64;
 } // static UINTN Int64ToUintn()
 
+/*
 static
 BOOLEAN pdNotUsed (VOID) {
     return (!PointerAvailable || !MouseTouchActive);
 } // static BOOLEAN pdNotUsed()
+*/
 
 EFI_STATUS pdUpdateState (VOID) {
     EFI_STATUS                 Status;
@@ -491,7 +495,11 @@ EFI_STATUS pdUpdateState (VOID) {
 
     Status = EFI_NOT_READY;
 
-    if (pdNotUsed()) {
+    #if defined (EFI32) && defined (__MAKEWITH_GNUEFI)
+    return EFI_NOT_READY;
+    #endif
+
+    if (!PointerAvailable) {
         return Status;
     }
 
@@ -571,13 +579,20 @@ EFI_STATUS pdUpdateState (VOID) {
             else if (TargetY >= ScreenH) State.Y = Int64ToUintn (TempINT64);
             else                         State.Y = Int32ToUintn (TargetY);
 
-            State.Holding = SPointerState.LeftButton;
+            State.Holding = (SPointerState.LeftButton || SPointerState.RightButton);
 
             break; // 'for' loop
         } // for
     } while (0); // This 'loop' only runs once
 
     State.Press = (LastHolding && !State.Holding);
+
+    if (State.X != LastXPos || State.Y != LastYPos) {
+        gPointerActuallyMoved = TRUE;
+        if (gSuppressPointerDraw) {
+            gSuppressPointerDraw = FALSE;
+        }
+    }
 
     if (EFI_ERROR(Status)) {
         Status = EFI_NOT_READY;
@@ -601,11 +616,19 @@ VOID pdDraw (VOID) {
     UINTN Height;
 
 
-    if (pdNotUsed()) {
+    if (!MouseTouchActive) {
         return;
     }
 
-    MY_FREE_IMAGE(Background);
+    if (gSuppressPointerDraw) {
+        return;
+    }
+
+    if (Background != NULL) {
+        egDrawImage (Background, LastXPos, LastYPos);
+        MY_FREE_IMAGE(Background);
+    }
+
     if (MouseImage != NULL) {
         Width = (
             (State.X + MouseImage->Width) > ScreenW
@@ -628,14 +651,13 @@ VOID pdDraw (VOID) {
 
     LastXPos = State.X;
     LastYPos = State.Y;
+    gPointerActuallyMoved = FALSE;
 } // VOID pdDraw()
 
 ////////////////////////////////////////////////////////////////////////////////
 // Restores the background at the position the mouse was last drawn
 ////////////////////////////////////////////////////////////////////////////////
-VOID pdClear (
-    BOOLEAN VetStatus
-) {
+VOID pdClear (VOID) {
     #if REFIT_DEBUG > 0
     CHAR16 *MsgStr;
 
@@ -643,9 +665,7 @@ VOID pdClear (
     #endif
 
 
-    if (VetStatus &&
-        pdNotUsed()
-    ) {
+    if (!MouseTouchActive) {
         return;
     }
 
