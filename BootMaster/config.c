@@ -62,8 +62,8 @@
 #include "../include/refit_call_wrapper.h"
 
 #define LINUX_OPTIONS_FILENAMES \
-L"refind_linux.conf,refind-linux.conf,\
-refindplus_linux.conf,refindplus-linux.conf"
+L"refindplus_linux.conf,refindplus-linux.conf,\
+refind_linux.conf,refind-linux.conf"
 
 #define ENCODING_ISO8859_1                  (0)
 #define ENCODING_UTF8                       (1)
@@ -290,18 +290,11 @@ VOID SyncShowTools (VOID) {
     }
 
     SetShowTools               =              TRUE;
-    GlobalConfig.ShowTools[0]  =         TAG_SHELL;
-    GlobalConfig.ShowTools[1]  =       TAG_MEMTEST;
-    GlobalConfig.ShowTools[2]  =         TAG_GDISK;
-    GlobalConfig.ShowTools[3]  =  TAG_RECOVERY_MAC;
-    GlobalConfig.ShowTools[4]  =  TAG_RECOVERY_WIN;
-    GlobalConfig.ShowTools[5]  =           TAG_MOK;
-    GlobalConfig.ShowTools[6]  =         TAG_ABOUT;
-    GlobalConfig.ShowTools[7]  =        TAG_HIDDEN;
-    GlobalConfig.ShowTools[8]  =      TAG_SHUTDOWN;
-    GlobalConfig.ShowTools[9]  =        TAG_REBOOT;
-    GlobalConfig.ShowTools[10] =      TAG_FIRMWARE;
-    GlobalConfig.ShowTools[11] =      TAG_FWUPDATE;
+    GlobalConfig.ShowTools[0]  =         TAG_ABOUT;
+    GlobalConfig.ShowTools[1]  =        TAG_HIDDEN;
+    GlobalConfig.ShowTools[2]  =    TAG_CSR_ROTATE;
+    GlobalConfig.ShowTools[3]  =     TAG_BOOTORDER;
+    GlobalConfig.ShowTools[4]  =      TAG_SHUTDOWN;
 } // static VOID SyncShowTools()
 
 // Returns FALSE if *p points to the end of a token, TRUE otherwise.
@@ -1223,8 +1216,7 @@ LOADER_ENTRY * InitializeStanza (
                         #endif
 
                         SetLoaderDefaults (
-                            StanzaEntry,
-                            TokenList[1],
+                            StanzaEntry, TokenList[1],
                             CurrentVolume
                         );
 
@@ -1303,7 +1295,10 @@ LOADER_ENTRY * InitializeStanza (
         MY_FREE_POOL(StanzaEntry->LoaderPath);
         StanzaEntry->LoaderPath = StrDuplicate (LoaderToken);
 
-        SetLoaderDefaults (StanzaEntry, LoaderToken, CurrentVolume);
+        SetLoaderDefaults (
+            StanzaEntry, LoaderToken,
+            CurrentVolume
+        );
         MY_FREE_POOL(LoaderToken);
 
         DefaultsSet = TRUE;
@@ -1538,7 +1533,7 @@ REFIT_FILE * GenerateOptionsFromEtcFstab (
 
                 BREAD_CRUMB(L"%a:  7a 1a 2a 2", __func__);
                 Line = PoolPrint (
-                    L"\"Boot with Normal Options\"    \"ro root=%s\"\n",
+                    L"\"Boot with Default Options\"    \"ro root=%s\"\n",
                     Root
                 );
 
@@ -1550,7 +1545,7 @@ REFIT_FILE * GenerateOptionsFromEtcFstab (
 
                 BREAD_CRUMB(L"%a:  7a 1a 2a 5", __func__);
                 Line = PoolPrint (
-                    L"\"Boot into Single User Mode\"  \"ro root=%s single\"\n",
+                    L"\"Boot into SingleUser Mode\"    \"ro root=%s single\"\n",
                     Root
                 );
 
@@ -1649,7 +1644,7 @@ REFIT_FILE * GenerateOptionsFromPartTypes (VOID) {
 
         BREAD_CRUMB(L"%a:  4a 2", __func__);
         Line = PoolPrint (
-            L"\"Boot with Normal Options\"    \"%s root=/dev/disk/by-partuuid/%s\"\n",
+            L"\"Boot with Default Options\"    \"%s root=/dev/disk/by-partuuid/%s\"\n",
             WriteStatus, GuidString
         );
         MergeStrings ((CHAR16 **) &(Options->Buffer), Line, 0);
@@ -1657,7 +1652,7 @@ REFIT_FILE * GenerateOptionsFromPartTypes (VOID) {
 
         BREAD_CRUMB(L"%a:  4a 3", __func__);
         Line = PoolPrint (
-            L"\"Boot into Single User Mode\"  \"%s root=/dev/disk/by-partuuid/%s single\"\n",
+            L"\"Boot into SingleUser Mode\"    \"%s root=/dev/disk/by-partuuid/%s single\"\n",
             WriteStatus, GuidString
         );
 
@@ -2779,6 +2774,7 @@ VOID ReadConfig (
                         else if (MyStriCmp (Flag, L"linux"   )) GlobalConfig.GraphicsFor |= GRAPHICS_FOR_LINUX;
                         else if (MyStriCmp (Flag, L"elilo"   )) GlobalConfig.GraphicsFor |= GRAPHICS_FOR_ELILO;
                         else if (MyStriCmp (Flag, L"clover"  )) GlobalConfig.GraphicsFor |= GRAPHICS_FOR_CLOVER;
+                        else if (MyStriCmp (Flag, L"systemd" )) GlobalConfig.GraphicsFor |= GRAPHICS_FOR_SYSTEMD;
                         else if (MyStriCmp (Flag, L"windows" )) GlobalConfig.GraphicsFor |= GRAPHICS_FOR_WINDOWS;
                         else if (MyStriCmp (Flag, L"opencore")) GlobalConfig.GraphicsFor |= GRAPHICS_FOR_OPENCORE;
                     }
@@ -3188,7 +3184,7 @@ VOID ReadConfig (
             }
             #endif
 
-            Flag = TokenList[i];
+            Flag = TokenList[1];
             if (MyStriCmp (Flag, L"noscale")) {
                 GlobalConfig.BannerScale = BANNER_NOSCALE;
             }
@@ -3752,9 +3748,31 @@ VOID ReadConfig (
             }
             #endif
 
-            GlobalConfig.FollowSymlinks = HandleBoolean (
-                TokenList, TokenCount
-            );
+            MY_FREE_POOL(GlobalConfig.FollowSymlinks);
+            if (TokenCount == 1) {
+                // Token set alone
+                GlobalConfig.FollowSymlinks = StrDuplicate (
+                    SYM_TAG_ALL
+                );
+            }
+            else {
+                // Token set with parameters
+                if (!MyStriCmp (TokenList[1], L"false") &&
+                    !MyStriCmp (TokenList[1], L"off")   &&
+                    !MyStriCmp (TokenList[1], L"0")
+                ) {
+                    GlobalConfig.FollowSymlinks = StrDuplicate (
+                        (TokenCount == 2) ? SYM_TAG_ALL : TokenList[2]
+                    );
+                }
+                else {
+                    GlobalConfig.FollowSymlinks = (TokenCount == 2)
+                        ? StrDuplicate (SYM_TAG_OFF)
+                        : PoolPrint (
+                            L"%s,%s", SYM_TAG_OFF, TokenList[2]
+                        );
+                }
+            }
         }
         else if (
             MyStriCmp (TokenList[0], L"csr_normalise") ||
@@ -3839,7 +3857,11 @@ VOID ReadConfig (
         }
         else if (
             !GotNoneNoBootLogo &&
-            MyStriCmp (TokenList[0], L"disable_bootlogo")
+            (
+                MyStriCmp (TokenList[0], L"disable_exitlogo_image") ||
+                MyStriCmp (TokenList[0], L"disable_bootlogo_image") ||
+                MyStriCmp (TokenList[0], L"disable_bootlogo")
+            )
         ) {
             #if REFIT_DEBUG > 0
             if (!OuterLoop && !OutLoopNoBootLogo) {
@@ -3880,6 +3902,36 @@ VOID ReadConfig (
                     }
                 }
             } // for
+        }
+        else if (
+            MyStriCmp (TokenList[0], L"disable_exitlogo_scale") ||
+            MyStriCmp (TokenList[0], L"disable_bootlogo_scale")
+        ) {
+            #if REFIT_DEBUG > 0
+            if (!OuterLoop) {
+                UpdatedToken = LogUpdate (
+                    TokenList[0], NotRunBefore, TRUE
+                );
+            }
+            #endif
+
+            DeclineSetting = HandleBoolean (TokenList, TokenCount);
+            GlobalConfig.BootLogoScale = (DeclineSetting) ? FALSE : TRUE;
+        }
+        else if (
+            MyStriCmp (TokenList[0], L"disable_exitlogo_clear") ||
+            MyStriCmp (TokenList[0], L"disable_bootlogo_clear")
+        ) {
+            #if REFIT_DEBUG > 0
+            if (!OuterLoop) {
+                UpdatedToken = LogUpdate (
+                    TokenList[0], NotRunBefore, TRUE
+                );
+            }
+            #endif
+
+            DeclineSetting = HandleBoolean (TokenList, TokenCount);
+            GlobalConfig.BootLogoClear = (DeclineSetting) ? FALSE : TRUE;
         }
         else if (MyStriCmp (TokenList[0], L"supply_nvme")) {
             #if REFIT_DEBUG > 0

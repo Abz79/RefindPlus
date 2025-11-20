@@ -100,10 +100,11 @@
 
 CHAR16         *BootSelection = NULL;
 CHAR16         *ValidText     = L"Invalid Loader";
-
+BOOLEAN         ExitLogoFlag  = FALSE;
 extern BOOLEAN  IsBoot;
 extern BOOLEAN  ShimFound;
 extern BOOLEAN  SecureFlag;
+extern BOOLEAN  UsingAltImg;
 
 static
 VOID WarnSecureBootError(
@@ -187,7 +188,7 @@ VOID WarnSecureBootError(
 // for information on Intel VMX features
 static
 VOID DoEnableAndLockVMX(VOID) {
-#if defined (EFIX64) | defined (EFI32)
+#if defined (EFIX64) || defined (EFI32)
     UINT32 msr;
     UINT32 low_bits;
     UINT32 high_bits;
@@ -892,7 +893,8 @@ EFI_STATUS StartEFIImage (
                     !(GlobalConfig.DisableBootLogo & DISABLE_BOOTLOGO_WIN)
                 );
 
-                if (ShowLogoLin || ShowLogoWin) {
+                ExitLogoFlag = (ShowLogoLin || ShowLogoWin);
+                if (ExitLogoFlag) {
                     if (ScreenW > 1024 && ScreenH > 1024) {
                         // Stash current size
                         OrigIconBig = GlobalConfig.IconSizes[ICON_SIZE_BIG];
@@ -908,7 +910,9 @@ EFI_STATUS StartEFIImage (
                         GlobalConfig.IconSizes[ICON_SIZE_BIG] *= ScaleLogo;
                     }
 
-                    BootLogoImage = LoadOSIcon (NULL, EXIT_SPLASH, TRUE);
+                    BootLogoImage = LoadOSIcon (
+                        NULL, EXIT_SPLASH, TRUE
+                    );
                     if (BootLogoImage == NULL) {
                         TmpStr = NULL;
 
@@ -934,25 +938,34 @@ EFI_STATUS StartEFIImage (
                     }
 
                     if (BootLogoImage != NULL) {
-                        BltImageAlpha (
-                            BootLogoImage,
-                            (ScreenW - BootLogoImage->Width ) >> 1,
-                            (ScreenH - BootLogoImage->Height) >> 1,
-                            &(GlobalConfig.ScreenBackground->PixelData[0])
-                        );
+                        if (UsingAltImg) {
+                            // Discard image and skip display
+                            MY_FREE_IMAGE(BootLogoImage);
+                            UsingAltImg = FALSE;
+                        }
+                        else {
+                            BltImageAlpha (
+                                BootLogoImage,
+                                (ScreenW - BootLogoImage->Width ) >> 1,
+                                (ScreenH - BootLogoImage->Height) >> 1,
+                                &(GlobalConfig.ScreenBackground->PixelData[0])
+                            );
 
-                        // Avoid mere flash
-                        //
-                        // Wait 0.75 seconds
-                        // DA-TAG: 100 Loops == 1 Sec
-                        RefitStall (75);
+                            // Avoid mere flash
+                            //
+                            // Wait 0.75 seconds
+                            // DA-TAG: 100 Loops == 1 Sec
+                            RefitStall (75);
+                        }
                     }
 
                     if (ScreenW > 1024 && ScreenH > 1024) {
                         // Reset to stashed size
                         GlobalConfig.IconSizes[ICON_SIZE_BIG] = OrigIconBig;
                     }
-                } // if ShowLogoLin || ShowLogoWin
+
+                    ExitLogoFlag = FALSE;
+                } // if ExitLogoFlag
 
                 if (GlobalConfig.WriteSystemdVars && OSType == 'L') {
                     // Inform SystemD of RefindPlus ESP
@@ -1016,8 +1029,10 @@ EFI_STATUS StartEFIImage (
             }
             #endif
 
-            // Free BootLogoImage ... Delibrately delayed
-            MY_FREE_IMAGE(BootLogoImage);
+            if (GlobalConfig.BootLogoClear) {
+                // Free BootLogoImage ... Delibrately delayed
+                MY_FREE_IMAGE(BootLogoImage);
+            }
 
             // Close open file handles
             UninitRefitLib();
@@ -1029,11 +1044,17 @@ EFI_STATUS StartEFIImage (
             );
 
 
+            /******************************************************/
             /* Control returns here if child image calls 'Exit()' */
+            /******************************************************/
 
 
-            // DA-TAG: Used in 'ScanDriverDir()'
-            NewImageHandle = ChildImageHandle;
+            // DA-TAG: Pass ChildImageHandle back to caller if set.
+            //         Must dereference pointer (*NewImageHandle).
+            //         Currently only used in 'ScanDriverDir()'.
+            if (NewImageHandle != NULL) {
+                *NewImageHandle = ChildImageHandle;
+            }
 
             #if REFIT_DEBUG > 0
             MsgStrEx = PoolPrint (
@@ -1111,6 +1132,9 @@ EFI_STATUS StartEFIImage (
 
     // DA-TAG: bailout:
     MY_FREE_POOL(FullLoadOptions);
+
+    // Free BootLogoImage on bailout
+    MY_FREE_IMAGE(BootLogoImage);
 
     if (!IsDriver) {
         FinishExternalScreen();

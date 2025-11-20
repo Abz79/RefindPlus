@@ -1,4 +1,4 @@
-0.14.2.AD (PRE-RELEASE):
+0.14.2.AD (11 NOV 2025):
 -----------------------
 - Adds Full `Linux EFI Bootable Kernel` Support
   * Now fully supports booting `Linux Unified Kernel` images
@@ -6,8 +6,60 @@
     - Linux `EFISTUB` images without `PE32` signatures were tagged `invalid`
     - Now considered valid if a `LINUX_PE_MAGIC` signature is found instead
     - Ref: https://github.com/torvalds/linux/blob/master/include/linux/pe.h
+- Fixes Scanning Linux Setups That Lack `Initrd` Files. Thanks @Mardekaar
+- Fixes Issues with Using the `banner_scale` Setting. Thanks @Mardekaar
 - Fixes `Auto Defined BadRAM` Handling
   * This element of the `TagBadRAM` feature was previously a `NOOP`
+- Improves Image Scaling Handling. Thanks @emperor06
+  * Now uses floating-point arithmetic on 64-bit architectures
+- Improves `FollowSymlinks` Handling
+  * Can now be targeted at specific volumes
+    - Removes impacts on other installed instances
+  * The `follow_symlinks` token now accepts optional additional parameters
+    - `follow_symlinks`: Symlinks always followed
+    - `follow_symlinks ON`: Symlinks always followed
+    - `follow_symlinks OFF`: Symlinks never followed
+    - `follow_symlinks OFF "Vol_1,Vol_2"`: Symlinks followed unless on list
+    - `follow_symlinks ON "Vol_9,Vol_10"`: Symlinks followed only if listed
+- Improves `UEFI Secure Boot` Handling
+  * `SBAT` sections now added to binaries at compile time
+  * Signed binaries now available
+    - Option to sign binaries added to repository `Artefact Creation` Github action
+- Improves `SD-Boot` Handling
+  * Manual Stanzas now accept a `SystemD` OSType
+  * The `use_graphics_for` token now accepts a `systemd` input
+    - This allows specifically loading `SD-Boot` in graphics mode
+- Improves `APFS Data Volume` Handling
+  * The `VolName - DATA` tag extended to match more languages
+    - German, Spanish, French, Portuguese, Italian, Finnish, Dutch, Croatian
+  * English is still given preference for technical reasons
+  * TODO: Process that does not rely on this tag is best.
+- Amends Feature: `BootLogo` to `ExitLogo`
+  * Renamed to distinguish from inherited `BootLogo` feature
+    - That applied to Legacy BIOS Boot items
+    - `BootLogo` and `ExitLogo` may be fully merged later
+  * Auto scaling of ExitLogo image can now be skipped
+    - Via a new `disable_exitlogo_scale` configuration token
+  * Final clearing of ExitLogo image can now be skipped
+    - Via a new `disable_exitlogo_clear` configuration token
+  * Adjusted image loading priority as follows:
+    - `boot_outlogo.[xyz]` file will be used if present
+    - `boot_[distro].[xyz]` will be used if present otherwise
+    - `os_[distro].[xyz]` will be used if present otherwise
+    - `os_[type].[xyz]` will be used if present otherwise
+    - Nothing will be displayed as exit logo otherwise
+  * Renames Configuration Token
+    - `disable_bootlogo` to `disable_exitlogo_image`
+  * NOTE: The following development stage settings are deprecated
+    - `disable_bootlogo_clear` for `disable_exitlogo_clear`
+    - `disable_bootlogo_image` for `disable_exitlogo_image`
+    - `disable_bootlogo_scale` for `disable_exitlogo_scale`
+- Amends Linux Options Definition File, `xyz_linux.conf`, Handling
+  * Now prioritises `refindplus_linux` and `refindplus-linux` conf files
+  * Upstream variants are now only sought if these are not found
+- Amends `ShowTools` Handling
+  * The default list is now limited to `internal` tools
+  * That is, tools that do not require external binaries
 
 
 0.14.2.AC (03 JUN 2025):

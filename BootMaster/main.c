@@ -69,6 +69,24 @@
 #include "../libeg/efiUgaDraw.h"
 #include "../libeg/libeg.h"
 
+#ifndef __REFIT_SBAT_
+#  define __REFIT_SBAT_
+#  if defined(__APPLE__)
+__attribute__((used, section("__SBAT,__sbat"), visibility("default")))
+#  else
+__attribute__((used, section(".sbat"), visibility("default")))
+#  endif
+
+const char sbat_section[] =
+"sbat,1,SBAT Version,sbat,1,https://github.com/rhboot/shim/blob/main/SBAT.md\n"
+"refindplus,1,Dayo Akanji,refindplus," VERSION_STRING_ASCII ",https://github.com/refindplusrepo\n"
+"refindplus.user,1,A User,refindplus_user,1.0.0,https://example.org/\n";
+
+// Shield 'sbat_section' from garbage collection
+__attribute__((used))
+volatile static const void *force_sbat_link = &sbat_section;
+#endif
+
 #ifndef __MAKEWITH_GNUEFI
 #define LibLocateProtocol EfiLibLocateProtocol
 #endif
@@ -119,7 +137,6 @@ REFIT_CONFIG GlobalConfig = {
     .DisableNvramPanicLog      =                   FALSE,
     .DecoupleKeyF10            =                   FALSE,
     .NvramProtectEx            =                   FALSE,
-    .FollowSymlinks            =                   FALSE,
     .GzippedLoaders            =                   FALSE,
     .SupplyUEFI                =                   FALSE,
     .SupplyNVME                =                   FALSE,
@@ -129,6 +146,8 @@ REFIT_CONFIG GlobalConfig = {
     .ScanAllESP                =                    TRUE,
     .ScanAllLinux              =                    TRUE,
     .FoldLinuxKernels          =                    TRUE,
+    .BootLogoScale             =                    TRUE,
+    .BootLogoClear             =                    TRUE,
     .RescanDXE                 =                    TRUE,
     .HiddenTags                =                    TRUE,
     .LegacySync                =                    TRUE,
@@ -181,6 +200,7 @@ REFIT_CONFIG GlobalConfig = {
     .DontScanFirmware          =                    NULL,
     .WindowsRecoveryFiles      =                    NULL,
     .MacOSRecoveryFiles        =                    NULL,
+    .FollowSymlinks            =                    NULL,
     .DriverDirs                =                    NULL,
     .IconsDir                  =                    NULL,
     .SetBootArgs               =                    NULL,
@@ -210,7 +230,8 @@ UINTN                  EfiMajorVersion      =                     0;
 UINT32                 AccessFlagsBoot      =     ACCESS_FLAGS_BOOT;
 UINT32                 AccessFlagsFull      =     ACCESS_FLAGS_FULL;
 CHAR16                *ArchType             =                  NULL;
-CHAR16                *ArchBits             =                  NULL;
+CHAR16                *OurToolTag           =                  NULL;
+CHAR16                *OurTypeTag           =                  NULL;
 CHAR16                *VendorInfo           =                  NULL;
 CHAR16                *gHiddenTools         =                  NULL;
 CHAR16                *AllToolLocations     =                  NULL;
@@ -1929,11 +1950,11 @@ REFIT_MENU_SCREEN * InitToolMenu (
 
     #if REFIT_DEBUG > 0
     ALT_LOG(1, LOG_LINE_THIN_SEP, L"Prepare Menu Screen");
-    ALT_LOG(1, LOG_LINE_NORMAL, L"Screen Title:- 'Run %s Info'", ToolPurpose);
+    ALT_LOG(1, LOG_LINE_NORMAL, L"Screen Title:- 'Prep %s Menu'", ToolPurpose);
     #endif
 
     Menu->TitleImage = BuiltinIcon  (BuiltinIconID          );
-    Menu->Title      = StrDuplicate (Title                  );
+    Menu->Title      = PoolPrint    (L"%s Menu", Title      );
     Menu->Hint1      = StrDuplicate (SELECT_OPTION_HINT     );
     Menu->Hint2      = StrDuplicate (RETURN_MAIN_SCREEN_HINT);
 
@@ -2706,7 +2727,6 @@ VOID AboutRefindPlus (VOID) {
     UINT32             CsrStatus;
     CHAR16            *TmpStr;
     INTN               DefaultEntry;
-    UINTN              MenuExit;
     UINTN              ScreenW;
     UINTN              ScreenH;
     BOOLEAN            RetVal;
@@ -2741,12 +2761,15 @@ VOID AboutRefindPlus (VOID) {
 
     AddMenuInfoLine (
         AboutMenu,
-        #if defined(__MAKEWITH_TIANO)
-            L"Built with TianoCore EDK II",
-        #else
-            L"Built with GNU-EFI",
-        #endif
-        FALSE
+        PoolPrint (
+#if defined(__MAKEWITH_TIANO)
+            L"Built with TianoCore EDK II via %s%s",
+#else
+            L"Built with GNU-EFI via %s%s",
+#endif
+            OurToolTag, OurTypeTag
+        ),
+        TRUE
     );
 
     if (ScreenSize == 0) {
@@ -2760,28 +2783,28 @@ VOID AboutRefindPlus (VOID) {
         LimitStringLength (TmpStr, (MAX_LINE_LENGTH - 16));
     }
 
-    AddMenuInfoLine (AboutMenu, PoolPrint (L"Firmware      : %s", TmpStr),   TRUE);
-    AddMenuInfoLine (AboutMenu, PoolPrint (L"Platform      : %s", ArchType), TRUE);
+    AddMenuInfoLine (AboutMenu, PoolPrint (L"Firmware           : %s", TmpStr),   TRUE);
+    AddMenuInfoLine (AboutMenu, PoolPrint (L"Platform           : %s", ArchType), TRUE);
     MY_FREE_POOL(TmpStr);
     AddMenuInfoLine (
         AboutMenu,
         PoolPrint (
-            L"EFI Version   : %s %d.%02d%s",
+            L"EFI Version        : %s %d.%02d%s",
             (EfiMajorVersion > 1) ? L"UEFI" : L"EFI",
             EfiMajorVersion,
             gST->Hdr.Revision & ((1 << 16) - 1),
             (WarnVersionEFI)
-                ? L" (Spoofed by Others)"
+                ? L" (Spoof by Others)"
                 : (SetSysTab)
-                    ? L" (Spoofed)" : L""
+                    ? L" (Self Spoof)" : L""
         ),
         TRUE
     );
 
-    if (!AppleFirmware && !HasMacOS) {
-        TmpStr = StrDuplicate (L"Not Applicable");
-    }
-    else {
+    // Always show CSR status on Apple Mac
+    //   even if Mac OS is not detected.
+    // Only show on UEFI-PC if Mac OS is detected
+    if (AppleFirmware || HasMacOS) {
         #if REFIT_DEBUG > 0
         MY_MUTELOGGER_SET;
         #endif
@@ -2807,18 +2830,30 @@ VOID AboutRefindPlus (VOID) {
         TmpStr = (!EFI_ERROR(Status))
             ? StrDuplicate (gCsrStatus)
             : PoolPrint (L"%s ... %r", gCsrStatus, Status);
-        // More than ~65 causes empty info page on 800x600 display ... '16' is current preamble length
+        // More than ~65 causes empty info page on 800x600 display
+        // Current preamble length is 21
         if (ScreenSize < 801) {
-            LimitStringLength (TmpStr, (MAX_LINE_LENGTH - 16));
+            LimitStringLength (
+                TmpStr,
+                MAX_LINE_LENGTH - 21
+            );
         }
+
+        AddMenuInfoLine (
+            AboutMenu,
+            PoolPrint (
+                L"CSR Setting        : %s",
+                TmpStr
+            ),
+            TRUE
+        );
+        MY_FREE_POOL(TmpStr);
     }
-    AddMenuInfoLine (AboutMenu, PoolPrint (L"CSR Setting   : %s", TmpStr), TRUE);
-    MY_FREE_POOL(TmpStr);
 
     AddMenuInfoLine (
         AboutMenu,
         PoolPrint (
-            L"Secure Boot   : %s",
+            L"Secure Boot (UEFI) : %s",
             (SecureFlag)
                 ? (ShimFound) ? L"Active and Shim Present"   : L"Active but Shim Absent"
                 : (ShimFound) ? L"Inactive but Shim Present" : L"Inactive and Shim Absent"
@@ -2829,9 +2864,12 @@ VOID AboutRefindPlus (VOID) {
     TmpStr = egScreenDescription();
     // More than ~65 causes empty info page on 800x600 display ... '16' is current preamble length
     if (ScreenSize < 801) {
-        LimitStringLength (TmpStr, (MAX_LINE_LENGTH - 16));
+        LimitStringLength (
+            TmpStr,
+            MAX_LINE_LENGTH - 16
+        );
     }
-    AddMenuInfoLine (AboutMenu, PoolPrint (L"Screen Output : %s", TmpStr), TRUE);
+    AddMenuInfoLine (AboutMenu, PoolPrint (L"Screen Mode/Output : %s", TmpStr), TRUE);
     MY_FREE_POOL(TmpStr);
 
     AddMenuInfoLine (AboutMenu, L"",                                                         FALSE);
@@ -2839,13 +2877,19 @@ VOID AboutRefindPlus (VOID) {
     AddMenuInfoLine (AboutMenu, L"Copyright 2012-2024 Roderick W. Smith (Portions)",         FALSE);
     AddMenuInfoLine (AboutMenu, L"Copyright 2006-2010 Christoph Pfisterer (Portions)",       FALSE);
     AddMenuInfoLine (AboutMenu, L"Copyright The Intel Corporation and Others (Portions)",    FALSE);
-    AddMenuInfoLine (AboutMenu, L"Provided under the GNU General Public License (v3/Later)", FALSE);
+    AddMenuInfoLine (AboutMenu, L"Provided Under the GNU General Public License (v3/Later)", FALSE);
 
     RetVal = GetMenuEntryReturn (&AboutMenu);
     if (RetVal) {
         DefaultEntry = 9999; // Use the Max Index
-        Style = (AllowGraphicsMode) ? GraphicsMenuStyle : TextMenuStyle;
-        MenuExit = DrawMenuScreen (AboutMenu, Style, &DefaultEntry, NULL);
+        Style = (
+            AllowGraphicsMode
+        ) ? GraphicsMenuStyle : TextMenuStyle;
+
+        DrawMenuScreen (
+            AboutMenu, Style,
+            &DefaultEntry, NULL
+        );
     }
 
     FreeMenuScreen (&AboutMenu);
@@ -3673,9 +3717,14 @@ VOID ResetCall (
     ); */
 
     #if REFIT_DEBUG > 0
-    MsgStr = (IsRestart)
-        ? StrDuplicate (L"R U N   S Y S T E M   R E S T A R T")
-        : StrDuplicate (L"R U N   S Y S T E M   S H U T D O W N");
+    MsgStr = (
+        IsRestart
+    ) ? StrDuplicate (
+        L"R U N   S Y S T E M   R E S T A R T"
+    ) : StrDuplicate (
+        L"R U N   S Y S T E M   S H U T D O W N"
+    );
+    ALT_LOG(1, LOG_BLANK_LINE_TWO, L"X");
     ALT_LOG(1, LOG_LINE_SEPARATOR, L"%s", MsgStr);
     LOG_MSG("%s", MsgStr);
     LOG_MSG("\n");
@@ -3751,7 +3800,6 @@ EFI_STATUS EFIAPI efi_main (
     CHAR16            *EntryTitle;
     CHAR16            *EntryPath;
     CHAR16            *VarNVram;
-    CHAR16             KeyAsString[2];
     BOOLEAN            FoundTool;
     BOOLEAN            RunOurTool;
     BOOLEAN            MokProtocol;
@@ -3840,42 +3888,61 @@ EFI_STATUS EFIAPI efi_main (
     #endif
 
     /* Architecture */
-#if defined(EFIX64)
+    #if defined(EFIX64)
     ArchType = L"x86_64";
-    ArchBits = L"64 bit";
-#elif defined(EFI32)
+    #elif defined(EFI32)
     ArchType = L"x86_32";
-    ArchBits = L"32 bit";
-#elif defined(EFIAARCH64)
+    #elif defined(EFIAARCH64)
     ArchType = L"ARM_64";
-    ArchBits = L"64 bit";
-#else
+    #else
     ArchType = LABEL_UNKNOWN;
-#endif
+    #endif
 
     #if REFIT_DEBUG > 0
-    if (ArchBits == NULL) {
-        LOG_MSG("Arch/Type:- '%s'", ArchType);
-    }
-    else {
-        LOG_MSG("Arch/Type:- '%s (%s)'", ArchType, ArchBits);
-    }
+    LOG_MSG("Arch/Type:- '%s'", ArchType);
+    LOG_MSG("\n");
+    #endif
+
+    /* Toolchain */
+    OurTypeTag = L" (Local)";
+    #if defined(__clang__)
+        #if defined(__APPLE__)
+            #if defined(__GNUC__)
+                OurToolTag = L"macOS/XCODE5";
+            #else
+                OurToolTag = L"macOS/CLANG";
+            #endif
+        #else
+            OurToolTag = L"Other/CLANG";
+        #endif
+    #elif defined(__GNUC__)
+        #if defined(__APPLE__)
+            OurToolTag = L"macOS/GCC5";
+        #else
+            OurToolTag = L"Other/GCC5";
+        #endif
+    #else
+        OurToolTag = L"Other/Unknown";
+    #endif
+
+    #if REFIT_DEBUG > 0
+    LOG_MSG("Toolchain:- '%s'%s", OurToolTag, OurTypeTag);
     LOG_MSG("\n");
 
     /* Build Engine */
     LOG_MSG("Made With:- ");
-#if defined(__MAKEWITH_TIANO)
+    #if defined(__MAKEWITH_TIANO)
     LOG_MSG("'TianoCore EDK II'");
-#elif defined(__MAKEWITH_GNUEFI)
+    #elif defined(__MAKEWITH_GNUEFI)
     LOG_MSG("'GNU-EFI'");
-#else
+    #else
     LOG_MSG("Unknown DevKit");
-#endif
+    #endif
     LOG_MSG("\n");
 
     /* TimeStamp */
     LOG_MSG(
-        "Timestamp:- '%d-%02d-%02d %02d:%02d:%02d (UTC)'",
+        "Timestamp:- '%d-%02d-%02d %02d:%02d:%02d'",
         NowYear, NowMonth,
         NowDay, NowHour,
         NowMinute, NowSecond
@@ -3907,16 +3974,16 @@ EFI_STATUS EFIAPI efi_main (
     #if REFIT_DEBUG > 0
     /* Log System Details */
     LogBasicInfo (MokProtocol);
-    #endif
 
     // First scan volumes by calling ScanVolumes() to find "SelfVolume",
     //    SelfVolume is required by LoadDrivers() and ReadConfig();
     // A second call is needed later to enumerate volumes as well as
     //    to register new filesystem(s) accessed by drivers.
-    #if REFIT_DEBUG > 0
     MY_MUTELOGGER_SET;
     #endif
+
     ScanVolumes();
+
     #if REFIT_DEBUG > 0
     MY_MUTELOGGER_OFF;
     if (!SelfVolSet) {
@@ -3994,28 +4061,40 @@ EFI_STATUS EFIAPI efi_main (
     #ifdef __MAKEWITH_TIANO
     Status = CheckStatusOC();
     if (Status == EFI_ALREADY_STARTED) {
+        #if REFIT_DEBUG > 0
+        LOG_MSG("** WARN: RefindPlus Chainload via OpenCore Detected\n");
+        LOG_MSG("      1. Some Features *MAY NOT* Function As Expected\n");
+        LOG_MSG("      2. ");
+        #endif
+
         // Disable 'NvramProtect' and 'NvramProtectEx' if chainloaded via OpenCore
         if (GlobalConfig.NvramProtect ||
             GlobalConfig.NvramProtectEx
         ) {
-            WarnOC                      =  TRUE;
             GlobalConfig.NvramProtect   = FALSE;
             GlobalConfig.NvramProtectEx = FALSE;
 
             #if REFIT_DEBUG > 0
-            LOG_MSG("** WARN: RefindPlus Chainload via OpenCore Detected\n");
-            LOG_MSG("      1. Some Features *MAY NOT* Function as Expected\n");
-            if (!AppleFirmware) {
-                LOG_MSG("      2. ");
-            }
-            else {
-                LOG_MSG("      2. The 'NvramProtect' Feature Has Been Disabled\n");
+            // DA-TAG: WarnOC for convenience here
+            //         Proper 'TRUE' tag set later
+            WarnOC = (
+                GlobalConfig.EnableTouch ||
+                GlobalConfig.EnableMouse
+            );
+
+            if (AppleFirmware && WarnOC) {
+                LOG_MSG("The 'NvramProtect' Feature Has Been Disabled\n");
                 LOG_MSG("      3. ");
             }
-            LOG_MSG("RefindPlus Pointer Device Settings are Ignored");
-            LOG_MSG("\n\n");
             #endif
         }
+
+        #if REFIT_DEBUG > 0
+        LOG_MSG("RefindPlus Pointer Device Settings Are Ignored");
+        LOG_MSG("\n\n");
+        #endif
+
+        WarnOC = TRUE;
     }
 
     /* Unlock partitions if required */
@@ -4049,8 +4128,15 @@ EFI_STATUS EFIAPI efi_main (
     LOG_MSG("%s      SyncTrust:- '%03d'",    TAG_ITEM_A(GlobalConfig.SyncTrust    ));
     LOG_MSG("%s      SyncAPFS:- '%s'",       TAG_ITEM_C(GlobalConfig.SyncAPFS     ));
     LOG_MSG("%s      HelpIcon:- '%s'",       TAG_ITEM_C(GlobalConfig.HelpIcon     ));
-    LOG_MSG("%s      CheckDXE:- '%s'",       TAG_ITEM_C(GlobalConfig.RescanDXE    ));
+    LOG_MSG("%s      MacLegacy:- ",          OffsetNext                            );
+    if (!AppleFirmware) {
+        LOG_MSG("'Disabled'"                                                       );
+    }
+    else {
+        LOG_MSG("'%s'", (GlobalConfig.LegacySync) ? L"Active" : L"Inactive"        );
+    }
 
+    LOG_MSG("%s      CheckDXE:- '%s'",       TAG_ITEM_C(GlobalConfig.RescanDXE    ));
     LOG_MSG("%s      TextOnly:- ",           OffsetNext                            );
     if (ForceTextOnly) {
         LOG_MSG("'Forced'"                                                         );
@@ -4058,19 +4144,10 @@ EFI_STATUS EFIAPI efi_main (
     else {
         LOG_MSG("'%s'", (GlobalConfig.TextOnly) ? L"Active" : L"Inactive"          );
     }
+
     LOG_MSG("%s      DirectGOP:- '%s'",      TAG_ITEM_C(GlobalConfig.UseDirectGop ));
-
-    LOG_MSG("%s      LegacySync:- ",         OffsetNext                            );
-    if (!AppleFirmware) {
-        LOG_MSG("'Disabled'"                                                       );
-    }
-    else {
-        LOG_MSG("'%s'", (GlobalConfig.LegacySync) ? L"Enabled" : L"Inactive"       );
-    }
-
     LOG_MSG("%s      ScanAllESP:- '%s'",     TAG_ITEM_C(GlobalConfig.ScanAllESP   ));
     LOG_MSG("%s      DirectBoot:- '%s'",     TAG_ITEM_C(GlobalConfig.DirectBoot   ));
-
     LOG_MSG("%s      ProtectNvram:- ",       OffsetNext                            );
     if (!AppleFirmware || RunningOC) {
         if (!AppleFirmware) {
@@ -4084,6 +4161,8 @@ EFI_STATUS EFIAPI efi_main (
         LOG_MSG("'%s'", (GlobalConfig.NvramProtect) ? L"Active" : L"Inactive"      );
     }
 
+    LOG_MSG("%s      ExitLogoClear:- '%s'",  TAG_ITEM_C(GlobalConfig.BootLogoClear));
+    LOG_MSG("%s      ExitLogoScale:- '%s'",  TAG_ITEM_C(GlobalConfig.BootLogoScale));
     LOG_MSG("%s      RansomDrives:- ",       OffsetNext                            );
     if (AppleFirmware) {
         LOG_MSG("'Disabled'"                                                       );
@@ -4111,7 +4190,15 @@ EFI_STATUS EFIAPI efi_main (
         LOG_MSG("'%s'", (GlobalConfig.NvramProtectEx) ? L"Active" : L"Inactive"    );
     }
 
-    LOG_MSG("%s      FollowSymlinks:- '%s'",   TAG_ITEM_C(GlobalConfig.FollowSymlinks));
+    LOG_MSG("%s      FollowSymlinks:- ",      OffsetNext                           );
+    if (GlobalConfig.FollowSymlinks == NULL ||
+        MyStriCmp (SYM_TAG_OFF, GlobalConfig.FollowSymlinks)
+    ) {
+        LOG_MSG("'Inactive'"                                                       );
+    }
+    else {
+        LOG_MSG("'Active'"                                                         );
+    }
     LOG_MSG("\n\n");
 
     // DA-TAG: Prime Status for SupplyUEFI
@@ -4246,9 +4333,6 @@ EFI_STATUS EFIAPI efi_main (
                 gST->ConIn, &key
             );
             if (!EFI_ERROR(Status)) {
-                KeyAsString[0] = key.UnicodeChar;
-                KeyAsString[1] = 0;
-
                 if (key.ScanCode    == SCAN_ESC    ||
                     key.UnicodeChar == CHAR_BACKSPACE
                 ) {
@@ -4631,7 +4715,7 @@ EFI_STATUS EFIAPI efi_main (
         // Wait 1 second
         // DA-TAG: 100 Loops == 1 Sec
         RefitStall (100);
-    }
+    } // if SecureBootFailure
 
     // Show TagBadRAM Error
     if (WarnTagBadRAM) {
@@ -4697,7 +4781,7 @@ EFI_STATUS EFIAPI efi_main (
         // Wait 1 second
         // DA-TAG: 100 Loops == 1 Sec
         RefitStall (100);
-    }
+    } // if WarnTagBadRAM
 
     // Set CSR if required
     AlignCSR();
@@ -5110,6 +5194,43 @@ EFI_STATUS EFIAPI efi_main (
                     if (!OurLoaderEntry->UseGraphicsMode) {
                         OurLoaderEntry->UseGraphicsMode = (
                             GlobalConfig.GraphicsFor & GRAPHICS_FOR_GRUB
+                        );
+                    }
+                }
+                else if (
+                    OurLoaderEntry->OSType == 'S'                              ||
+                    (SubScreenBoot && IsStriStr (SelectionName, L"SystemD"))   ||
+                    IsStriStr (EntryTitle,                      L"SystemD")    ||
+                    (SubScreenBoot && IsStriStr (SelectionName, L"GummiBoot")) ||
+                    IsStriStr (EntryTitle,                      L"GummiBoot")
+                ) {
+                    #if REFIT_DEBUG > 0
+                    MsgStr = StrDuplicate (
+                        L"Load Instance: Linux (SD-Boot)"
+                    );
+                    ALT_LOG(1, LOG_THREE_STAR_SEP, L"%s", MsgStr);
+                    // DA-TAG: Using separate instances of 'Received User Input'
+                    LOG_MSG("%s:",
+                        (GlobalConfig.DirectBoot)
+                            ? L"Run DirectBoot"
+                            : L"Received User Input"
+                    );
+                    LOG_MSG(
+                        "%s  - %s:- '%s'",
+                        OffsetNext, MsgStr, EntryPath
+                    );
+
+                    MY_FREE_POOL(MsgStr);
+                    #endif
+
+                    SkipTrustChain = TRUE;
+                    if (GlobalConfig.SyncTrust & ENFORCE_TRUST_LINUX) {
+                        KeepTrustChain = TRUE;
+                    }
+
+                    if (!OurLoaderEntry->UseGraphicsMode) {
+                        OurLoaderEntry->UseGraphicsMode = (
+                            GlobalConfig.GraphicsFor & GRAPHICS_FOR_SYSTEMD
                         );
                     }
                 }

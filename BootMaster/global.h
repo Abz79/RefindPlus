@@ -92,6 +92,9 @@
 #define TAG_RESET_NVRAM          (25)
 #define TAG_FIRMWARE_LOADER      (26)
 
+#define TAG_SPACER               (98)
+#define TAG_RETURN               (99)
+
 #define NUM_SCAN_OPTIONS         (10)
 
 // Type of Legacy Boot support detected
@@ -107,16 +110,15 @@
 #define DISCOVERY_TYPE_MANUAL     (2)
 
 #ifdef __MAKEWITH_GNUEFI
-
 // Define BBS Device Types
-#define BBS_FLOPPY             (0x01)
-#define BBS_HARDDISK           (0x02)
-#define BBS_CDROM              (0x03)
-#define BBS_PCMCIA             (0x04)
-#define BBS_USB                (0x05)
-#define BBS_EMBED_NETWORK      (0x06)
-#define BBS_BEV_DEVICE         (0x80)
-#define BBS_UNKNOWN            (0xFF)
+#   define BBS_FLOPPY             (0x01)
+#   define BBS_HARDDISK           (0x02)
+#   define BBS_CDROM              (0x03)
+#   define BBS_PCMCIA             (0x04)
+#   define BBS_USB                (0x05)
+#   define BBS_EMBED_NETWORK      (0x06)
+#   define BBS_BEV_DEVICE         (0x80)
+#   define BBS_UNKNOWN            (0xFF)
 #endif
 
 // BIOS Boot Specification (BBS) device types, as returned in DevicePath->Type field
@@ -171,12 +173,15 @@
 #define BASE_REZ                (600)
 
 #ifndef EFI_OS_INDICATIONS_BOOT_TO_FW_UI
-#define EFI_OS_INDICATIONS_BOOT_TO_FW_UI 0x0000000000000001ULL
+#   define EFI_OS_INDICATIONS_BOOT_TO_FW_UI 0x0000000000000001ULL
 #endif
 
+#define SYM_TAG_ALL           L"ALL"
+#define SYM_TAG_OFF           L"X@X@X"
 #define DEFAULT_ICONS_DIR     L"icons"
 #define DEFAULT_STRING_DELIM  L" @+@ "
 #define INITIAL_STRING_DELIM  L" @@ "
+#define GEN_TAG               L"<-#->"
 
 #define LABEL_UNKNOWN         L"Unknown"
 
@@ -253,6 +258,10 @@ EFI\\OEM\\Boot\\bootmgfw.efi"
 // Default Ventoy Partitions
 #define VENTOY_NAMES          L"VTOYEFI,Ventoy"
 
+// Some APFS 'Data' Volume Tags
+#define DATA_NAME_APFS \
+L"Data,Daten,Datos,Donnees,Dados,Dati,Tiedot,Gegevens,Podaci"
+
 // Misc Mac OS Paths/Files
 #define MACOSX_LOADER_DIR     L"System\\Library\\CoreServices"
 #define MACOSX_LOADER_PATH    ( MACOSX_LOADER_DIR L"\\boot.efi" )
@@ -274,58 +283,59 @@ EFI\\OEM\\Boot\\bootmgfw.efi"
 // scan_all_linux_kernels option is set in the configuration file. Causes kernels WITHOUT
 // a ".efi" extension to be found when scanning for boot loaders.
 #if defined(EFIAARCH64)
-#define LINUX_PREFIXES        L"vmlinuz,Image,kernel"
+#   define LINUX_PREFIXES        L"vmlinuz,Image,kernel"
 #else
-#define LINUX_PREFIXES        L"vmlinuz,bzImage,kernel"
+#   define LINUX_PREFIXES        L"vmlinuz,bzImage,kernel"
 #endif
 
 // Return codes for SyncTrust
-#define SYNC_TRUST_HALT           (0) // Forced to halt on error
-#define SYNC_TRUST_EXIT           (1) // User exit via "Esc" etc
-#define SYNC_TRUST_SKIP           (2) // User prefers direct boot
-#define SYNC_TRUST_BOOT           (3) // User prefers native boot
+#define SYNC_TRUST_HALT            (0) // Forced to halt on error
+#define SYNC_TRUST_EXIT            (1) // User exit via "Esc" etc
+#define SYNC_TRUST_SKIP            (2) // User prefers direct boot
+#define SYNC_TRUST_BOOT            (3) // User prefers native boot
 
 // Bit codes (Actual Decimal) ... Used in GlobalConfig.DisableBootLogo
-#define DISABLE_BOOTLOGO_OFF      (0) // Binary: 0000 0000 0000
-#define DISABLE_BOOTLOGO_LIN      (1) // Binary: 0000 0000 0001
-#define DISABLE_BOOTLOGO_WIN      (2) // Binary: 0000 0000 0010
-#define DISABLE_BOOTLOGO_ALL      (3) // Binary: 0000 0000 0011 (1 + 2)
+#define DISABLE_BOOTLOGO_OFF       (0) // Binary: 0000 0000 0000
+#define DISABLE_BOOTLOGO_LIN       (1) // Binary: 0000 0000 0001
+#define DISABLE_BOOTLOGO_WIN       (2) // Binary: 0000 0000 0010
+#define DISABLE_BOOTLOGO_ALL       (3) // Binary: 0000 0000 0011 (1 + 2)
 
 // Bit codes (Actual Decimal) ... Used in GlobalConfig.SyncTrust
-#define ENFORCE_TRUST_NONE        (0) // Binary: 0000 0000 0000
-#define ENFORCE_TRUST_MACOS       (1) // Binary: 0000 0000 0001
-#define ENFORCE_TRUST_LINUX       (2) // Binary: 0000 0000 0010
-#define ENFORCE_TRUST_WINDOWS     (4) // Binary: 0000 0000 0100
-#define ENFORCE_TRUST_OPENCORE    (8) // Binary: 0000 0000 1000
-#define ENFORCE_TRUST_CLOVER     (16) // Binary: 0000 0001 0000
-#define ENFORCE_TRUST_OTHERS     (32) // Binary: 0000 0010 0000
-#define REQUIRE_TRUST_VERIFY     (64) // Binary: 0000 0100 0000
-#define ENFORCE_TRUST_EVERY     (127) // Binary: 0000 0111 1111 (1 + 2 + 4 + 8 + 16 + 32 + 64)
+#define ENFORCE_TRUST_NONE         (0) // Binary: 0000 0000 0000
+#define ENFORCE_TRUST_MACOS        (1) // Binary: 0000 0000 0001
+#define ENFORCE_TRUST_LINUX        (2) // Binary: 0000 0000 0010
+#define ENFORCE_TRUST_WINDOWS      (4) // Binary: 0000 0000 0100
+#define ENFORCE_TRUST_OPENCORE     (8) // Binary: 0000 0000 1000
+#define ENFORCE_TRUST_CLOVER      (16) // Binary: 0000 0001 0000
+#define ENFORCE_TRUST_OTHERS      (32) // Binary: 0000 0010 0000
+#define REQUIRE_TRUST_VERIFY      (64) // Binary: 0000 0100 0000
+#define ENFORCE_TRUST_EVERY      (127) // Binary: 0000 0111 1111 (1 + 2 + 4 + 8 + 16 + 32 + 64)
 
 // Bit codes (Actual Decimal) ... Used in GlobalConfig.GraphicsFor
-#define GRAPHICS_FOR_NONE         (0) // Binary: 0000 0000 0000
-#define GRAPHICS_FOR_OSX          (1) // Binary: 0000 0000 0001
-#define GRAPHICS_FOR_LINUX        (2) // Binary: 0000 0000 0010
-#define GRAPHICS_FOR_WINDOWS      (4) // Binary: 0000 0000 0100
-#define GRAPHICS_FOR_GRUB         (8) // Binary: 0000 0000 1000
-#define GRAPHICS_FOR_ELILO       (16) // Binary: 0000 0001 0000
-#define GRAPHICS_FOR_TOOLS       (32) // Binary: 0000 0010 0000
-#define GRAPHICS_FOR_CLOVER      (64) // Binary: 0000 0100 0000
-#define GRAPHICS_FOR_OPENCORE   (128) // Binary: 0000 1000 0000
-#define GRAPHICS_FOR_EVERYTHING (255) // Binary: 0000 1111 1111 (1 + 2 + 4 + 8 + 16 + 32 + 64 + 128)
+#define GRAPHICS_FOR_NONE          (0) // Binary: 0000 0000 0000
+#define GRAPHICS_FOR_OSX           (1) // Binary: 0000 0000 0001
+#define GRAPHICS_FOR_LINUX         (2) // Binary: 0000 0000 0010
+#define GRAPHICS_FOR_WINDOWS       (4) // Binary: 0000 0000 0100
+#define GRAPHICS_FOR_GRUB          (8) // Binary: 0000 0000 1000
+#define GRAPHICS_FOR_ELILO        (16) // Binary: 0000 0001 0000
+#define GRAPHICS_FOR_TOOLS        (32) // Binary: 0000 0010 0000
+#define GRAPHICS_FOR_CLOVER       (64) // Binary: 0000 0100 0000
+#define GRAPHICS_FOR_SYSTEMD     (128) // Binary: 0000 1000 0000
+#define GRAPHICS_FOR_OPENCORE    (256) // Binary: 0001 0000 0000
+#define GRAPHICS_FOR_EVERYTHING  (511) // Binary: 0001 1111 1111 (1 + 2 + 4 + 8 + 16 + 32 + 64 + 128 + 256)
 
 // Bit codes (Actual Decimal) ... Used in GlobalConfig.HideUIFlags
-#define HIDEUI_FLAG_NONE          (0) // Binary: 0000 0000 0000
-#define HIDEUI_FLAG_BANNER        (1) // Binary: 0000 0000 0001
-#define HIDEUI_FLAG_LABEL         (2) // Binary: 0000 0000 0010
-#define HIDEUI_FLAG_SINGLEUSER    (4) // Binary: 0000 0000 0100
-#define HIDEUI_FLAG_HWTEST        (8) // Binary: 0000 0000 1000
-#define HIDEUI_FLAG_ARROWS       (16) // Binary: 0000 0001 0000
-#define HIDEUI_FLAG_HINTS        (32) // Binary: 0000 0010 0000
-#define HIDEUI_FLAG_EDITOR       (64) // Binary: 0000 0100 0000
-#define HIDEUI_FLAG_SAFEMODE    (128) // Binary: 0000 1000 0000
-#define HIDEUI_FLAG_BADGES      (256) // Binary: 0001 0000 0000
-#define HIDEUI_FLAG_ALL         (511) // Binary: 0001 1111 1111 (1 + 2 + 4 + 8 + 16 + 32 + 64 + 128 + 256)
+#define HIDEUI_FLAG_NONE           (0) // Binary: 0000 0000 0000
+#define HIDEUI_FLAG_BANNER         (1) // Binary: 0000 0000 0001
+#define HIDEUI_FLAG_LABEL          (2) // Binary: 0000 0000 0010
+#define HIDEUI_FLAG_SINGLEUSER     (4) // Binary: 0000 0000 0100
+#define HIDEUI_FLAG_HWTEST         (8) // Binary: 0000 0000 1000
+#define HIDEUI_FLAG_ARROWS        (16) // Binary: 0000 0001 0000
+#define HIDEUI_FLAG_HINTS         (32) // Binary: 0000 0010 0000
+#define HIDEUI_FLAG_EDITOR        (64) // Binary: 0000 0100 0000
+#define HIDEUI_FLAG_SAFEMODE     (128) // Binary: 0000 1000 0000
+#define HIDEUI_FLAG_BADGES       (256) // Binary: 0001 0000 0000
+#define HIDEUI_FLAG_ALL          (511) // Binary: 0001 1111 1111 (1 + 2 + 4 + 8 + 16 + 32 + 64 + 128 + 256)
 
 // Default hint text for program-launch submenus
 #define SUBSCREEN_HINT1            L"Use arrow keys to move selection and press 'Enter' to run selected item"
@@ -432,6 +442,7 @@ typedef struct {
     MBR_PARTITION_INFO        *MbrPartitionTable;
     BOOLEAN                    IsReadable;
     UINT32                     FSType;
+    BOOLEAN                    AllowSymlinks;
 } REFIT_VOLUME;
 
 typedef struct _refit_menu_entry {
@@ -517,7 +528,6 @@ typedef struct {
     BOOLEAN                     DisableNvramPanicLog;
     BOOLEAN                     DecoupleKeyF10;
     BOOLEAN                     NvramProtectEx;
-    BOOLEAN                     FollowSymlinks;
     BOOLEAN                     GzippedLoaders;
     BOOLEAN                     SupplyUEFI;
     BOOLEAN                     SupplyNVME;
@@ -527,6 +537,8 @@ typedef struct {
     BOOLEAN                     ScanAllESP;
     BOOLEAN                     ScanAllLinux;
     BOOLEAN                     FoldLinuxKernels;
+    BOOLEAN                     BootLogoScale;
+    BOOLEAN                     BootLogoClear;
     BOOLEAN                     RescanDXE;
     BOOLEAN                     HiddenTags;
     BOOLEAN                     LegacySync;
@@ -579,6 +591,7 @@ typedef struct {
     CHAR16                     *DontScanFirmware;
     CHAR16                     *WindowsRecoveryFiles;
     CHAR16                     *MacOSRecoveryFiles;
+    CHAR16                     *FollowSymlinks;
     CHAR16                     *DriverDirs;
     CHAR16                     *IconsDir;
     CHAR16                     *SetBootArgs;
@@ -678,20 +691,21 @@ EFI_STATUS GetHardwareNvramVariable (
 
 #define LOG_BLOCK_SEP         (0)
 #define LOG_BLANK_LINE_SEP    (1)
-#define LOG_LINE_SPECIAL      (2)
-#define LOG_LINE_SAME         (3)
-#define LOG_LINE_NORMAL       (4)
-#define LOG_LINE_SEPARATOR    (5)
-#define LOG_LINE_THIN_SEP     (6)
-#define LOG_STAR_SEPARATOR    (7)
-#define LOG_THREE_STAR_SEP    (8)
-#define LOG_THREE_STAR_MID    (9)
-#define LOG_THREE_STAR_END   (10)
-#define LOG_STAR_HEAD_SEP    (11)
-#define LOG_STAR_HEAD_SEPX   (12)
-#define LOG_LINE_FORENSIC    (13)
-#define LOG_LINE_EXIT        (14)
-#define LOG_LINE_BASE        (15)
+#define LOG_BLANK_LINE_TWO    (2)
+#define LOG_LINE_SPECIAL      (3)
+#define LOG_LINE_SAME         (4)
+#define LOG_LINE_NORMAL       (5)
+#define LOG_LINE_SEPARATOR    (6)
+#define LOG_LINE_THIN_SEP     (7)
+#define LOG_STAR_SEPARATOR    (8)
+#define LOG_THREE_STAR_SEP    (9)
+#define LOG_THREE_STAR_MID   (10)
+#define LOG_THREE_STAR_END   (11)
+#define LOG_STAR_HEAD_SEP    (12)
+#define LOG_STAR_HEAD_SEPX   (13)
+#define LOG_LINE_FORENSIC    (14)
+#define LOG_LINE_EXIT        (15)
+#define LOG_LINE_BASE        (16)
 
 VOID DeepLoggger (
     IN  INTN     level,

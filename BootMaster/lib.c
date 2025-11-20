@@ -2233,6 +2233,13 @@ BOOLEAN VolumeScanAllowed (
         return FALSE;
     }
 
+    if (!GlobalConfig.ScanAllESP &&
+        GuidsAreEqual (&(Volume->PartTypeGuid), &GuidESP) &&
+        !GuidsAreEqual (&(Volume->PartGuid), &SelfVolume->PartGuid)
+    ) {
+        return FALSE;
+    }
+
     if (!SkipRootDir && Volume->RootDir == NULL) {
         return FALSE;
     }
@@ -2349,12 +2356,15 @@ VOID ScanVolume (
     #endif
 
     EFI_STATUS                 Status;
+    CHAR16                    *VolGuid;
     EFI_DEVICE_PATH_PROTOCOL  *DevicePath;
     EFI_DEVICE_PATH_PROTOCOL  *NextDevicePath;
     EFI_DEVICE_PATH_PROTOCOL  *DiskDevicePath;
     EFI_DEVICE_PATH_PROTOCOL  *RemainingDevicePath;
     EFI_HANDLE                 WholeDiskHandle;
     UINTN                      PartialLength;
+    BOOLEAN                    CheckTagAll;
+    BOOLEAN                    CheckTagOff;
     BOOLEAN                    Bootable;
 
 
@@ -2362,14 +2372,14 @@ VOID ScanVolume (
     MY_HYBRIDLOGGER_SET;
     #endif
 
-    // Get device path
+    // Get Device Path
     Volume->DevicePath = DuplicateDevicePath (
         DevicePathFromHandle (Volume->DeviceHandle)
     );
 
-    Volume->DiskKind = DISK_KIND_INTERNAL;  // default
+    Volume->DiskKind = DISK_KIND_INTERNAL;  // Default
 
-    // Get block i/o
+    // Get Block I/O
     Status = REFIT_CALL_3_WRAPPER(
         gBS->HandleProtocol, Volume->DeviceHandle,
         &BlockIoProtocol, (VOID **) &(Volume->BlockIO)
@@ -2409,7 +2419,7 @@ VOID ScanVolume (
                 DevicePathSubType (DevicePath) == MSG_FIBRECHANNEL_DP
             )
         ) {
-            // USB/FireWire/FC device -> external
+            // USB/FireWire/FC Device is External Disk
             Volume->DiskKind = DISK_KIND_EXTERNAL;
             FoundExternalDisk = TRUE;
         }
@@ -2417,12 +2427,12 @@ VOID ScanVolume (
         if (DevicePathType    (DevicePath) == MEDIA_DEVICE_PATH &&
             DevicePathSubType (DevicePath) == MEDIA_CDROM_DP
         ) {
-            // El Torito entry -> optical disk
+            // El Torito Entry is Optical Disk
             Volume->DiskKind = DISK_KIND_OPTICAL;
         }
 
         if (DevicePathType (DevicePath) == MESSAGING_DEVICE_PATH) {
-            // Make a device path for the whole device
+            // Make Device Path for Whole Device
             PartialLength  = (UINT8 *) NextDevicePath - (UINT8 *)(Volume->DevicePath);
             DiskDevicePath = (EFI_DEVICE_PATH_PROTOCOL *) AllocatePool (
                 PartialLength + sizeof (EFI_DEVICE_PATH)
@@ -2438,7 +2448,7 @@ VOID ScanVolume (
                 EndDevicePath, sizeof (EFI_DEVICE_PATH)
             );
 
-            // Get the handle for that path
+            // Get Handle for Path
             RemainingDevicePath = DiskDevicePath;
             Status = REFIT_CALL_3_WRAPPER(
                 gBS->LocateDevicePath, &BlockIoProtocol,
@@ -2463,7 +2473,7 @@ VOID ScanVolume (
                 #endif
             }
             else {
-                // Get the device path for later
+                // Get Device Path for Later
                 Status = REFIT_CALL_3_WRAPPER(
                     gBS->HandleProtocol, WholeDiskHandle,
                     &DevicePathProtocol, (VOID **) &DiskDevicePath
@@ -2489,13 +2499,13 @@ VOID ScanVolume (
                     Volume->WholeDiskDevicePath = DuplicateDevicePath (DiskDevicePath);
                 }
 
-                // Look at the BlockIO protocol
+                // Check BlockIO Protocol
                 Status = REFIT_CALL_3_WRAPPER(
                     gBS->HandleProtocol, WholeDiskHandle,
                     &BlockIoProtocol, (VOID **) &Volume->WholeDiskBlockIO
                 );
                 if (!EFI_ERROR(Status)) {
-                    // Check the media block size
+                    // Check Media Block Size
                     if (Volume->WholeDiskBlockIO->Media->BlockSize == 2048) {
                         Volume->DiskKind = DISK_KIND_OPTICAL;
                     }
@@ -2524,7 +2534,7 @@ VOID ScanVolume (
         DevicePath = NextDevicePath;
     } // while
 
-    // Scan for bootcode and MBR table
+    // Scan for Bootcode and MBR Table
     Bootable = FALSE;
     ScanVolumeBootcode (Volume, &Bootable);
     if (Volume->DiskKind == DISK_KIND_OPTICAL) {
@@ -2571,8 +2581,57 @@ VOID ScanVolume (
 
     // Set 'IsReadable' Flag
     Volume->IsReadable = (
-        Volume->HasBootCode || Volume->RootDir != NULL
+        Volume->HasBootCode ||
+        Volume->RootDir != NULL
     ) ? TRUE : FALSE;
+
+    // Default 'AllowSymlinks'
+    // 'FALSE' == Skip Symlinks
+    Volume->AllowSymlinks = FALSE;
+
+	if (GlobalConfig.FollowSymlinks == NULL) {
+        // No Config ... Never Follow Symlinks
+		return;
+    }
+
+    CheckTagAll = MyStriCmp (
+        SYM_TAG_ALL, GlobalConfig.FollowSymlinks
+    );
+    CheckTagOff = MyStriCmp (
+        SYM_TAG_OFF, GlobalConfig.FollowSymlinks
+    );
+    if (CheckTagAll || CheckTagOff) {
+        // Handle 'Global List' Config Setting
+        if (CheckTagAll) {
+            Volume->AllowSymlinks = TRUE;
+        }
+
+        // Early Return ... Global Allow/Deny
+		return;
+    }
+
+    VolGuid = GuidAsString (&(Volume->PartGuid));
+    if (MyStrBegins (SYM_TAG_OFF,  GlobalConfig.FollowSymlinks)) {
+        // Handle 'Exclusion List' Config Setting
+        if (!IsListItem (Volume->VolName,  GlobalConfig.FollowSymlinks) &&
+            !IsListItem (Volume->FsName,   GlobalConfig.FollowSymlinks) &&
+            !IsListItem (Volume->PartName, GlobalConfig.FollowSymlinks) &&
+            !IsListItem (VolGuid,          GlobalConfig.FollowSymlinks)
+        ) {
+            Volume->AllowSymlinks = TRUE;
+        }
+    }
+    else {
+        // Handle 'Inclusion List' Config Setting
+        if (IsListItem (Volume->VolName,  GlobalConfig.FollowSymlinks) ||
+            IsListItem (Volume->FsName,   GlobalConfig.FollowSymlinks) ||
+            IsListItem (Volume->PartName, GlobalConfig.FollowSymlinks) ||
+            IsListItem (VolGuid,          GlobalConfig.FollowSymlinks)
+        ) {
+            Volume->AllowSymlinks = TRUE;
+        }
+    }
+    MY_FREE_POOL(VolGuid);
 } // ScanVolume()
 
 static
@@ -2798,9 +2857,11 @@ VOID VetSyncAPFS (VOID) {
     CHAR16  *TmpMsg;
     #endif
 
-    UINTN    i, j;
+    UINTN    i, j, k;
     CHAR16  *CheckName;
     CHAR16  *TweakName;
+    CHAR16  *TestName;
+    CHAR16  *DataName;
     BOOLEAN  GotName;
 
 
@@ -2855,47 +2916,60 @@ VOID VetSyncAPFS (VOID) {
 
     // Filter '- Data' string tag out of all Volume Group names if present
     for (i = 0; i < DataVolumesCount; i++) {
-        if (!MyStrEnds (L"- Data", DataVolumes[i]->VolName)) {
-            continue;
-        }
+        k = 0;
+        while (1) {
+            DataName = FindCommaDelimited (
+                DATA_NAME_APFS, k++
+            );
+            if (DataName == NULL) break;
 
-        GotName = FALSE;
-        for (j = 0; j < SystemVolumesCount; j++) {
-            TweakName = SanitiseString (SystemVolumes[j]->VolName);
-            CheckName = PoolPrint (L"%s - Data", TweakName);
-
-            if (MyStriCmp (DataVolumes[i]->VolName, CheckName)) {
-                GotName = TRUE;
-            }
-            else {
-                if (!MyStriCmp (SystemVolumes[j]->VolName, TweakName)) {
-                    // Check against raw name string if apporpriate
-                    MY_FREE_POOL(CheckName);
-                    CheckName = PoolPrint (
-                        L"%s - Data",
-                        SystemVolumes[j]->VolName
-                    );
+            TestName = PoolPrint (L"- %s", DataName);
+            if (TestName != NULL &&
+                MyStrEnds (TestName, DataVolumes[i]->VolName)
+            ) {
+                GotName = FALSE;
+                for (j = 0; j < SystemVolumesCount; j++) {
+                    TweakName = SanitiseString (SystemVolumes[j]->VolName);
+                    CheckName = PoolPrint (L"%s - %s", TweakName, DataName);
 
                     if (MyStriCmp (DataVolumes[i]->VolName, CheckName)) {
                         GotName = TRUE;
                     }
-                }
+                    else {
+                        if (!MyStriCmp (SystemVolumes[j]->VolName, TweakName)) {
+                            // Check against raw name string if apporpriate
+                            MY_FREE_POOL(CheckName);
+                            CheckName = PoolPrint (
+                                L"%s - %s",
+                                SystemVolumes[j]->VolName,
+                                DataName
+                            );
+
+                            if (MyStriCmp (DataVolumes[i]->VolName, CheckName)) {
+                                GotName = TRUE;
+                            }
+                        }
+                    }
+
+                    MY_FREE_POOL(TweakName);
+                    MY_FREE_POOL(CheckName);
+
+                    if (GotName) {
+                        MY_FREE_POOL(DataVolumes[i]->VolName);
+                        DataVolumes[i]->VolName = StrDuplicate (
+                            SystemVolumes[j]->VolName
+                        );
+
+                        // DA_TAG: Only break here
+                        //         Strip from all
+                        break;
+                    }
+                } // for j = 0
             }
 
-            MY_FREE_POOL(TweakName);
-            MY_FREE_POOL(CheckName);
-
-            if (GotName) {
-                MY_FREE_POOL(DataVolumes[i]->VolName);
-                DataVolumes[i]->VolName = StrDuplicate (
-                    SystemVolumes[j]->VolName
-                );
-
-                // DA_TAG: Only break here
-                //         Strip from all
-                break;
-            }
-        } // for j = 0
+            MY_FREE_POOL(TestName);
+            MY_FREE_POOL(DataName);
+        } // while {Infinite}
     } // for i = 0
 
     #if REFIT_DEBUG > 0

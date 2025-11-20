@@ -54,6 +54,10 @@
 #include "../BootMaster/screenmgt.h"
 #include "../include/egemb_tool_clean_nvram.h"
 
+
+BOOLEAN          UsingAltImg = FALSE;
+extern BOOLEAN   ExitLogoFlag;
+
 //
 // well-known icons
 //
@@ -221,7 +225,8 @@ INTN UpdateBaseIcon (
 
     #if REFIT_DEBUG > 0
     ALT_LOG(1, LOG_LINE_NORMAL,
-        L"Find Icon File '%s.xyz'",
+        L"Find %s Img: '%s.xyz'",
+        (ExitLogoFlag) ? L"ExitLogo" : L"Icon",
         BaseName
     );
     #endif
@@ -311,6 +316,8 @@ EG_IMAGE * LoadOSIcon (
     UINTN            Index;
     INTN             OurId; // DA-TAG: 'INTN' is important
 
+
+    UsingAltImg = FALSE;
 
     if (!AllowGraphicsMode) {
         return NULL;
@@ -500,6 +507,12 @@ EG_IMAGE * LoadOSIcon (
             OurId = BASE_OS_ICON_DUMMY;
         }
     } while (0); // This 'loop' only runs once
+
+    if (OurId == BASE_OS_ICON_DUMMY ||
+        OurId == BASE_OS_ICON_UNKNOWN
+    ) {
+        UsingAltImg = TRUE;
+    }
 
     // Cache the image if appropriate.
     if (!BootLogo             &&

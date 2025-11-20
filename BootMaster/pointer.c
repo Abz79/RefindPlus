@@ -52,8 +52,6 @@ BOOLEAN                         PointerAvailable   =                            
 POINTER_STATE                   State;
 
 extern BOOLEAN                  RunningOC;
-BOOLEAN gSuppressPointerDraw = TRUE;
-BOOLEAN gPointerActuallyMoved = FALSE;
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -78,7 +76,7 @@ VOID pdCleanup (VOID) {
         return;
     }
 
-    pdClear();
+    pdClear (FALSE);
 
     if (HandleA != NULL) {
         for (Index = 0; Index < NumAPointerDevices; Index++) {
@@ -98,16 +96,20 @@ VOID pdCleanup (VOID) {
         }
     }
 
-    NumAPointerDevices = 0;
-    NumSPointerDevices = 0;
+    LastXPos = (
+        ScreenW > 1
+    ) ? ScreenW / 2 : ScreenW;
+    LastYPos = (
+        ScreenH > 1
+    ) ? ScreenH / 2 : ScreenH;
 
-    LastXPos = ScreenW / 2;
-    LastYPos = ScreenH / 2;
+    State.X        = LastXPos;
+    State.Y        = LastYPos;
+    State.Press    =    FALSE;
+    State.Holding  =    FALSE;
 
-    State.X  = ScreenW / 2;
-    State.Y  = ScreenH / 2;
-    State.Press    = FALSE;
-    State.Holding  = FALSE;
+    NumAPointerDevices    = 0;
+    NumSPointerDevices    = 0;
 
     #if REFIT_DEBUG > 0
     MsgStr = L"Disable Pointer Protocols ... Success";
@@ -139,7 +141,9 @@ VOID pdInitialize (VOID) {
 
 
     #if REFIT_DEBUG > 0
-    MsgStr = StrDuplicate (L"M A N A G E   P O I N T E R   D E V I C E S");
+    MsgStr = StrDuplicate (
+        L"M A N A G E   P O I N T E R   D E V I C E S"
+    );
     ALT_LOG(1, LOG_LINE_SEPARATOR, L"%s", MsgStr);
     LOG_MSG("%s", MsgStr);
     LOG_MSG("\n");
@@ -166,7 +170,9 @@ VOID pdInitialize (VOID) {
 
         #if REFIT_DEBUG > 0
         // DA-TAG: Use LOG_THREE_STAR_END for this instance
-        MsgStr = StrDuplicate (L"Running in 'Keyboard Only' Mode");
+        MsgStr = StrDuplicate (
+            L"Running in 'Keyboard Only' Mode"
+        );
         ALT_LOG(1, LOG_STAR_HEAD_SEP, L"%s", MsgStr);
         ALT_LOG(1, LOG_BLANK_LINE_SEP, L"X");
         LOG_MSG("\n\n");
@@ -180,7 +186,9 @@ VOID pdInitialize (VOID) {
     }
 
     #if REFIT_DEBUG > 0
-    MsgStr = StrDuplicate (L"Activate Pointer Devices:");
+    MsgStr = StrDuplicate (
+        L"Activate Pointer Devices:"
+    );
     ALT_LOG(1, LOG_LINE_NORMAL, L"%s", MsgStr);
     LOG_MSG("\n");
     LOG_MSG("%s", MsgStr);
@@ -230,9 +238,9 @@ VOID pdInitialize (VOID) {
                         #endif
                     }
                 } // for
-            }
-        }
-    } // if GlobalConfig.EnableTouch
+            } // if ProtocolA
+        } // if EFI_ERROR(HandleStatus)
+    } // if GlobalConfig.EnableTouch && !RunningOC
 
     #if REFIT_DEBUG > 0
     MsgStr = PoolPrint (
@@ -298,7 +306,7 @@ VOID pdInitialize (VOID) {
                 } // for
             } // if ProtocolS
         } // if/else EFI_ERROR(HandleStatus)
-    } // if GlobalConfig.EnableMouse
+    } // if GlobalConfig.EnableMouse && !RunningOC
 
     #if REFIT_DEBUG > 0
     MsgStr = PoolPrint (
@@ -310,7 +318,9 @@ VOID pdInitialize (VOID) {
     MY_FREE_POOL(MsgStr);
     #endif
 
-    if (!RunningOC && pdCount() == 0) {
+    if (!RunningOC &&
+        pdCount()  == 0
+    ) {
         MouseTouchActive = FALSE;
         PointerAvailable = FALSE;
     }
@@ -346,7 +356,10 @@ VOID pdInitialize (VOID) {
         Status = EFI_DEVICE_ERROR;
     }
 
-    MsgStr = PoolPrint (L"Enable Pointer Devices ... %r", Status);
+    MsgStr = PoolPrint (
+        L"Enable Pointer Devices ... %r",
+        Status
+    );
     ALT_LOG(1, LOG_LINE_NORMAL, L"%s", MsgStr);
     ALT_LOG(1, LOG_BLANK_LINE_SEP, L"X");
     LOG_MSG("\n\n");
@@ -459,12 +472,11 @@ UINTN Int64ToUintn (
     return (UINTN) TempINT64;
 } // static UINTN Int64ToUintn()
 
-/*
 static
 BOOLEAN pdNotUsed (VOID) {
     return (!PointerAvailable || !MouseTouchActive);
 } // static BOOLEAN pdNotUsed()
-*/
+
 EFI_STATUS pdUpdateState (VOID) {
     EFI_STATUS                 Status;
     UINTN                      Index;
@@ -475,14 +487,12 @@ EFI_STATUS pdUpdateState (VOID) {
     BOOLEAN                    LastHolding;
     EFI_SIMPLE_POINTER_STATE   SPointerState;
     EFI_ABSOLUTE_POINTER_STATE APointerState;
-    gPointerActuallyMoved = FALSE;
 
-    #if defined (EFI32) && defined (__MAKEWITH_GNUEFI)
-    return EFI_NOT_READY;
-    #endif
 
-    if (!PointerAvailable) {
-        return EFI_NOT_READY;
+    Status = EFI_NOT_READY;
+
+    if (pdNotUsed()) {
+        return Status;
     }
 
     LastHolding = State.Holding;
@@ -561,19 +571,13 @@ EFI_STATUS pdUpdateState (VOID) {
             else if (TargetY >= ScreenH) State.Y = Int64ToUintn (TempINT64);
             else                         State.Y = Int32ToUintn (TargetY);
 
-            State.Holding = (SPointerState.LeftButton || SPointerState.RightButton);
+            State.Holding = SPointerState.LeftButton;
 
             break; // 'for' loop
         } // for
     } while (0); // This 'loop' only runs once
 
-    State.Press = (!LastHolding && State.Holding); // Detects a BUTTON PRESS (button just went down)
-    if (State.X != LastXPos || State.Y != LastYPos) { // Mouse has moved
-        gPointerActuallyMoved = TRUE; // Set the flag to TRUE
-        if (gSuppressPointerDraw) { // If pointer was suppressed (hidden)
-            gSuppressPointerDraw = FALSE; // Show the pointer
-        }
-    }
+    State.Press = (LastHolding && !State.Holding);
 
     if (EFI_ERROR(Status)) {
         Status = EFI_NOT_READY;
@@ -596,19 +600,12 @@ VOID pdDraw (VOID) {
     UINTN Width;
     UINTN Height;
 
-    if (!MouseTouchActive) {
+
+    if (pdNotUsed()) {
         return;
     }
 
-    if (gSuppressPointerDraw) {
-        return;
-    }
-
-    if (Background != NULL) {
-        egDrawImage (Background, LastXPos, LastYPos); // This draws the saved background over the old pointer
-        MY_FREE_IMAGE(Background); // Frees the OLD background
-    }
-
+    MY_FREE_IMAGE(Background);
     if (MouseImage != NULL) {
         Width = (
             (State.X + MouseImage->Width) > ScreenW
@@ -628,6 +625,7 @@ VOID pdDraw (VOID) {
             );
         }
     }
+
     LastXPos = State.X;
     LastYPos = State.Y;
 } // VOID pdDraw()
@@ -635,7 +633,9 @@ VOID pdDraw (VOID) {
 ////////////////////////////////////////////////////////////////////////////////
 // Restores the background at the position the mouse was last drawn
 ////////////////////////////////////////////////////////////////////////////////
-VOID pdClear (VOID) {
+VOID pdClear (
+    BOOLEAN VetStatus
+) {
     #if REFIT_DEBUG > 0
     CHAR16 *MsgStr;
 
@@ -643,12 +643,18 @@ VOID pdClear (VOID) {
     #endif
 
 
-    if (!MouseTouchActive) {
+    if (VetStatus &&
+        pdNotUsed()
+    ) {
         return;
     }
 
     if (Background != NULL) {
-        egDrawImage (Background, LastXPos, LastYPos);
+        egDrawImage (
+            Background,
+            LastXPos,
+            LastYPos
+        );
         MY_FREE_IMAGE(Background);
     }
 
