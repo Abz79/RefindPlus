@@ -2250,7 +2250,7 @@ UINTN DrawMenuScreen (
         }
 
         // Position pointer at center of default selection
-        if (PointerEnabled) {
+        if (PointerEnabled && IsMainMenu) {
             UINTN PointerX, PointerY;
             GetMenuItemCenter (Screen, &State, State.CurrentSelection, &PointerX, &PointerY);
             pdSetPosition (PointerX, PointerY);
