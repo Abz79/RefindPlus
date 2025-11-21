@@ -75,6 +75,7 @@ typedef struct PointerStateStruct {
 VOID pdInitialize (VOID);
 VOID pdDraw (VOID);
 VOID pdClear (VOID);
+VOID pdSetPosition (UINTN X, UINTN Y);
 
 UINTN pdCount (VOID);
 

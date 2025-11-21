@@ -145,6 +145,16 @@ VOID LogExit (
 }
 #endif
 
+// Forward declaration for GetMenuItemCenter
+static
+VOID GetMenuItemCenter (
+    IN  REFIT_MENU_SCREEN *Screen,
+    IN  SCROLL_STATE      *State,
+    IN  UINTN              ItemIndex,
+    OUT UINTN             *CenterX,
+    OUT UINTN             *CenterY
+);
+
 static
 VOID InitSelection (VOID) {
     #if REFIT_DEBUG > 0
@@ -2231,6 +2241,13 @@ UINTN DrawMenuScreen (
         if (GlobalConfig.ScreensaverTime != -1) {
             UpdateScroll (&State, SCROLL_NONE);
         }
+
+        // Position pointer at center of default selection
+        if (PointerEnabled) {
+            UINTN PointerX, PointerY;
+            GetMenuItemCenter (Screen, &State, State.CurrentSelection, &PointerX, &PointerY);
+            pdSetPosition (PointerX, PointerY);
+        }
     }
 
     WaitForRelease = FALSE;
@@ -3575,6 +3592,71 @@ UINTN FindMainMenuItem (
 
     return ItemIndex;
 } // VOID FindMainMenuItem()
+
+////////////////////////////////////////////////////////////////////////////////
+// Calculate center position of a menu entry for pointer positioning
+////////////////////////////////////////////////////////////////////////////////
+static
+VOID GetMenuItemCenter (
+    IN  REFIT_MENU_SCREEN *Screen,
+    IN  SCROLL_STATE      *State,
+    IN  UINTN              ItemIndex,
+    OUT UINTN             *CenterX,
+    OUT UINTN             *CenterY
+) {
+    UINTN  i;
+    UINTN  row0PosX;
+    UINTN  row0PosY;
+    UINTN  row1PosX;
+    UINTN  row1PosY;
+    UINTN  itemPosX;
+    UINTN  row0PosXRunning;
+    UINTN  row1PosXRunning;
+
+    if (ItemIndex > State->MaxIndex) {
+        // Invalid index, default to screen center
+        *CenterX = ScreenW >> 1;
+        *CenterY = ScreenH >> 1;
+        return;
+    }
+
+    GetStateInfo (Screen, State);
+    row0PosX = IconRowPosX;
+    row0PosY = IconRowPosY;
+    row1PosX = ToolRowPosX;
+    row1PosY = ToolRowPosY;
+
+    row0PosXRunning = row0PosX;
+    row1PosXRunning = row1PosX;
+
+    // Calculate X position for the target item
+    for (i = 0; i <= State->MaxIndex; i++) {
+        if (i == ItemIndex) {
+            if (Screen->Entries[i]->Row == 0) {
+                itemPosX = row0PosXRunning;
+                *CenterX = itemPosX + (TileSizes[0] >> 1);
+                *CenterY = row0PosY + (TileSizes[0] >> 1);
+            }
+            else {
+                itemPosX = row1PosXRunning;
+                *CenterX = itemPosX + (TileSizes[1] >> 1);
+                *CenterY = row1PosY + (TileSizes[1] >> 1);
+            }
+            return;
+        }
+
+        if (Screen->Entries[i]->Row == 0) {
+            row0PosXRunning += TileSizes[0] + TILE_XSPACING;
+        }
+        else {
+            row1PosXRunning += TileSizes[1] + TILE_XSPACING;
+        }
+    }
+
+    // Fallback to screen center
+    *CenterX = ScreenW >> 1;
+    *CenterY = ScreenH >> 1;
+} // static VOID GetMenuItemCenter()
 
 VOID GenerateWaitList(VOID) {
     UINTN PointerCount;
