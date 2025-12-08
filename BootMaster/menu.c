@@ -2720,11 +2720,16 @@ UINTN DrawMenuScreen (
                         );
                         UserKeyPress = TRUE;
                         BlockRescan = FALSE;
+                        gSuppressPointerDraw = FALSE;
                     }
 
                     if (DrawSelection) {
                         DrawSelection        = FALSE;
                         State.PaintSelection =  TRUE;
+                    }
+
+                    if (PointerState.Press) {
+                        pdDraw();
                     }
 
                     // Log Pointer Event
@@ -2746,11 +2751,16 @@ UINTN DrawMenuScreen (
                         );
                         UserKeyPress = TRUE;
                         BlockRescan = FALSE;
+                        gSuppressPointerDraw = FALSE;
                     }
 
                     if (DrawSelection) {
                         DrawSelection        = FALSE;
                         State.PaintSelection =  TRUE;
+                    }
+
+                    if (PointerState.Press) {
+                        pdDraw();
                     }
 
                     // Log Pointer Event
