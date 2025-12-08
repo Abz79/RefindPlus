@@ -2702,11 +2702,16 @@ UINTN DrawMenuScreen (
                         UpdateScroll (&State, SCROLL_PAGE_UP);
                         UserKeyPress = TRUE;
                         BlockRescan = FALSE;
+                        gSuppressPointerDraw = FALSE;
                     }
 
                     if (DrawSelection) {
                         DrawSelection        = FALSE;
                         State.PaintSelection =  TRUE;
+                    }
+
+                    if (PointerState.Press) {
+                        pdDraw();
                     }
 
                     // Log Pointer Event
@@ -2725,11 +2730,16 @@ UINTN DrawMenuScreen (
                         UpdateScroll (&State, SCROLL_PAGE_DOWN);
                         UserKeyPress = TRUE;
                         BlockRescan = FALSE;
+                        gSuppressPointerDraw = FALSE;
                     }
 
                     if (DrawSelection) {
                         DrawSelection        = FALSE;
                         State.PaintSelection =  TRUE;
+                    }
+
+                    if (PointerState.Press) {
+                        pdDraw();
                     }
 
                     // Log Pointer Event
