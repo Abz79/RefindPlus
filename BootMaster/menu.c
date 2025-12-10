@@ -2184,6 +2184,7 @@ UINTN DrawMenuScreen (
     BOOLEAN                     UserKeyScan;
     BOOLEAN                     UserKeyPress;
     BOOLEAN                     WaitForRelease;
+    static BOOLEAN              MainMenuFirstRun = TRUE;
     INTN                        TimeoutCountdown; // MODIFIED: This variable's purpose is changed to store ms time
     INTN                        TimeSinceKeystroke;
     INTN                        PreviousTime = -1; // MODIFIED: Initialize to a value that ensures initial display
@@ -2250,10 +2251,11 @@ UINTN DrawMenuScreen (
         }
 
         // Position pointer at center of default selection
-        if (PointerEnabled && IsMainMenu) {
+        if (PointerEnabled && IsMainMenu && MainMenuFirstRun) {
             UINTN PointerX, PointerY;
             GetMenuItemCenter (Screen, &State, State.CurrentSelection, &PointerX, &PointerY);
             pdSetPosition (PointerX, PointerY);
+            MainMenuFirstRun = FALSE;
         }
     }
 
@@ -2507,7 +2509,6 @@ UINTN DrawMenuScreen (
             if (StyleFunc != MainMenuStyle && pdGetState().Press) {
                 // Prevent user from getting stuck on submenus
                 // Only 'About' screen currently reachable without keyboard
-                gSuppressPointerDraw = FALSE;
                 MenuExit = MENU_EXIT_ESCAPE;
                 break;
             }
