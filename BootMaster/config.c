@@ -1735,11 +1735,6 @@ VOID ExitOuter (
         GlobalConfig.NvramProtectEx = FALSE;
     }
 
-    if (GlobalConfig.EnableTouch) {
-        // Disable Mouse if Touch Active
-        GlobalConfig.EnableMouse = FALSE;
-    }
-
     if (GlobalConfig.SyncTrust  != ENFORCE_TRUST_NONE) {
         GlobalConfig.DirectBoot  = FALSE;
         GlobalConfig.Timeout     =     0;
