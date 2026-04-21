@@ -11,6 +11,16 @@ body:
         ---
 
 
+        **Try the item below first if RefindPlus fails to display/boot Linux.**
+        Especially if running Linux Kernel v6.17.4 or newer.
+        - Run RefindPlus with Linux filesystem drivers from version:- `0.14.2.AE or Newer`.
+
+        **NB:** Previous FS drivers failed on voids in binaries.
+
+
+        ---
+
+
         **Try the item below first if RefindPlus fails to display but responds to key inputs on Apple Macs.**
         Especially if running 5k monitors on Pre-2020 units as the firmware restricts third-party loaders.
         - Run RefindPlus with these config settings active:- `disable_set_consolegop` and `disable_set_applefb`.
@@ -39,25 +49,27 @@ body:
       label: Issue Screened
       description: |
           Confirm the items above have been read and applied as required.
-      type: choice
       options:
-        - 'SUGGESTED TESTS IGNORED despite applicable item'
-        - 'SUGGESTED TESTS EXECUTED or no applicable item'
+        - 'SUGGESTED_TESTS_EXECUTED or no_applicable_item'
+        - 'SUGGESTED_TESTS_IGNORED despite applicable_item'
+      default: 1
     validations:
       required: true
+
   - type: dropdown
     id: version
     attributes:
       label: RefindPlus Version
       description: Which version of RefindPlus is affected?
-      type: choice
       options:
-        - 'Official v0.14.2.AD Release'
+        - 'Official v0.14.2.AE Release'
         - 'Official Older Released Version'
         - 'Official Pre-Release Code Build'
         - 'Unofficially Modified Code Build'
+      default: 3
     validations:
       required: true
+
   - type: dropdown
     id: hardware
     attributes:
@@ -70,6 +82,7 @@ body:
         - 'Other Device'
     validations:
       required: true
+
   - type: textarea
     id: problem-description
     attributes:
@@ -80,12 +93,12 @@ body:
         Additionally, outline how to reproduce the problem.
     validations:
       required: true
+
   - type: dropdown
     id: problem-point
     attributes:
       label: Problem Point
       description: Where does the problem manifest itself?
-      multiple: true
       options:
         - 'Before RefindPlus Screen is Visible'
         - 'RefindPlus Screen Shows but Hangs'
@@ -93,8 +106,11 @@ body:
         - 'While Starting a Loader or Tool'
         - 'After Starting a Loader or Tool'
         - 'Another Point / Not Applicable'
+        - 'No_Idea and/or Forgotten_Details'
+      default: 6
     validations:
       required: true
+
   - type: dropdown
     id: os-type
     attributes:
@@ -107,6 +123,8 @@ body:
         - 'Mac OS Loader'
         - 'Win OS Loader'
         - 'Lin OS Loader'
+        - 'SDBoot Loader'
+        - 'The GRUB Loader'
         - 'OpenCore Loader'
         - 'Clover Loader'
         - 'Other Loader'
@@ -114,19 +132,22 @@ body:
         - 'All Items'
     validations:
       required: true
+
   - type: textarea
     id: log-file
     attributes:
       label: Debug Log
       description: |
         Please run the RefindPlus 'DBG' efi and add debug logs.\
-        Please attach log files and _DO NOT_ paste their contents.\
-        Attach log files by dragging/dropping on the field below.
+        Do attach the log files and _DO NOT_ paste their contents.\
+        Attach log files by dragging/dropping on the field below.\
+        Output log files are stored in the ESP holding RefindPlus.
       placeholder: |
         Reports that do not need log files are typically best as Discussions.
         Reports without log files will be automatically closed in most cases.
     validations:
       required: true
+
   - type: dropdown
     id: vet-debug
     attributes:
@@ -134,10 +155,13 @@ body:
       description: |
           Debug logs are almost always required and produced by running the 'DBG' efi.\
           Confirm log files are provided or that you are certain this is not required.
-      type: choice
       options:
-        - 'DEBUG LOGS NOT PROVIDED - disregarding guidance given'
-        - 'DEBUG LOGS ARE PROVIDED or omission clearly justified'
+        - 'DEBUG_LOGS_ARE_PROVIDED or omission_clearly_justified'
+        - 'DEBUG_LOGS_NOT_PROVIDED - disregarding_guidance_given'
+      default: 1
+    validations:
+      required: true
+
   - type: textarea
     id: extra-info
     attributes:
@@ -147,4 +171,5 @@ body:
       placeholder: |
         You can attach files by dragging/dropping them on this field.
         You can also add screenshots to shed more light on the issue.
-        Screenshot files can be saved by RefindPlus with the F10 key.
+        Screenshot files can be created from RefindPlus with Key F10.
+        Screenshot files will be saved in the ESP holding RefindPlus.
