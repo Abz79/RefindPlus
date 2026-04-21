@@ -1,3 +1,59 @@
+0.14.2.AE (14 APR 2026):
+-----------------------
+- Fixes `CleanNvram` Handling
+  * The required loader path had ended up empty
+    - This rendered the tool inoperable
+  * This bug was introduced in v0.14.2.AD (Commit d6cd6cd)
+- Fixes `SimpleTextOut` Reconnection Issues
+  * Some firmware reset to the console default resolution on reconnection
+    - This quirk was not accounted for when enforcing reconnection
+  * This bug was introduced in v0.14.2.AB (Commit 44b6d7d)
+- Fixes `BtrFS` Driver
+  * Cursor was not being properly iterated
+  * Refactoring of `fsw_strfunc.h` meant the driver was a `NOOP`
+    - This bug was introduced in v0.14.2.AC (Commit 9ac45b9)
+- Fixes Failure of FS Drivers to Handle `Sparse Holes`
+  * Resulted in a failure to boot Linux Kernel `v6.17.4/Newer`
+    - https://sf.net/p/refind/discussion/general/thread/172b9cbf09
+    - https://github.com/torvalds/linux/commit/3e86e4d74c0490e5fc5a7f8de8f29e7579c9ffe5
+  * This bug was inherited from legacy upstream code
+    - Fixed for `BtrFS`, `Ext4`, and `Ext2` drivers
+- Fixes and Improves `BadRamTag` Feature
+  * Feature renamed from previous `TagBadRAM`
+  * Applies various fixes to resolve breakages
+  * Applies various operational optimisation
+- Improves `Filesystem Driver` Setup
+  * Resurrects/Restores original debug print macros
+  * The various build types are now different in terms of debug output
+    - Avoid `DBG` and `NPT` drivers unless specifically debugging these
+  * Refactored Misc Driver Files
+    - BtrFS
+      * Added separate header file for declarations
+      * Moved misc ad-hoc mid-file declarations
+    - General
+      * Rationalised several `macro` names
+        - Now `ALL CAPS` for consistency
+      * Rationalised use of `static` functions
+- Improves `AppleLegacyLoader` Handling
+  * Used for Legacy BIOS Boot on some older Macs (AKA `BootCamp`)
+  * The hardcoded links grandfathered in from `rEFIt` have been removed
+    - These were kept as fallback links when dynamic link search was added
+  * The grandfathered dynamic link search has proved to work without fallback
+    - In any case, the hardcoded links also only included a subset of links
+    - Dynamic AppleLegacyLoader search was added to rEFIt in 2009:
+      * sf.net/p/refit/code/438
+      * sf.net/p/refit/code/440
+- Amends `SupplyNVME` Feature
+  * Disabled if `UEFI Secure Boot` active
+    - Avoids `Security Violation` errors
+  * Use `signed standalone drivers` instead
+- Renames Misc Configuration Tokens
+  * `badram_fix_list` to `badram_tag_list`
+  * `badram_fix_type` to `badram_tag_mode`
+  * `badram_fix_wide` to `badram_tag_wide`
+    - Functionality of this token was also changed
+
+
 0.14.2.AD (11 NOV 2025):
 -----------------------
 - Adds Full `Linux EFI Bootable Kernel` Support
@@ -25,10 +81,10 @@
   * `SBAT` sections now added to binaries at compile time
   * Signed binaries now available
     - Option to sign binaries added to repository `Artefact Creation` Github action
-- Improves `SD-Boot` Handling
+- Improves `SDBoot` Handling
   * Manual Stanzas now accept a `SystemD` OSType
   * The `use_graphics_for` token now accepts a `systemd` input
-    - This allows specifically loading `SD-Boot` in graphics mode
+    - This allows specifically loading `SDBoot` in graphics mode
 - Improves `APFS Data Volume` Handling
   * The `VolName - DATA` tag extended to match more languages
     - German, Spanish, French, Portuguese, Italian, Finnish, Dutch, Croatian

@@ -41,12 +41,12 @@
  * with this source code or binaries made from it.
  *
  */
-/*
- * Modified for RefindPlus
- * Copyright (c) 2020-2025 Dayo Akanji (sf.net/u/dakanji/profile)
- *
- * Modifications distributed under the preceding terms.
- */
+/**
+** Modified for RefindPlus
+** Copyright (c) 2020-2026 Dayo Akanji (sf.net/u/dakanji/profile)
+**
+** Modifications distributed under the preceding terms.
+**/
 
 #ifndef __GLOBAL_H_
 #define __GLOBAL_H_
@@ -283,9 +283,9 @@ L"Data,Daten,Datos,Donnees,Dados,Dati,Tiedot,Gegevens,Podaci"
 // scan_all_linux_kernels option is set in the configuration file. Causes kernels WITHOUT
 // a ".efi" extension to be found when scanning for boot loaders.
 #if defined(EFIAARCH64)
-#   define LINUX_PREFIXES        L"vmlinuz,Image,kernel"
+#   define LINUX_PREFIXES        L"vmlinuz,kernel,Image"
 #else
-#   define LINUX_PREFIXES        L"vmlinuz,bzImage,kernel"
+#   define LINUX_PREFIXES        L"vmlinuz,kernel,bzImage"
 #endif
 
 // Return codes for SyncTrust
@@ -381,8 +381,8 @@ L"Data,Daten,Datos,Donnees,Dados,Dati,Tiedot,Gegevens,Podaci"
 #ifdef __MAKEWITH_TIANO
 // DA-TAG: Forward Declaration for OpenCore Integration
 //         Limit to TianoCore Builds
-EFI_STATUS OcProvideConsoleGop (IN BOOLEAN Route);
-EFI_STATUS OcUseDirectGop (IN INT32 CacheType);
+EFI_STATUS OcProvideConsoleGop    (IN BOOLEAN Route);
+EFI_STATUS OcUseDirectGop         (IN INT32 CacheType);
 EFI_STATUS OcUseBuiltinTextOutput (IN EFI_CONSOLE_CONTROL_SCREEN_MODE Mode);
 #endif
 
@@ -420,9 +420,9 @@ typedef struct {
     EFI_HANDLE                 DeviceHandle;
     EFI_FILE_PROTOCOL         *RootDir;
     CHAR16                    *PartName;
-    CHAR16                    *FsName;   // Filesystem name
-    CHAR16                    *VolName;  // One of two above OR fs desc (e.g., "2 GiB FAT volume")
-    UINT32                     VolRole;  // APFS_VOLUME_ROLE
+    CHAR16                    *FsName;                 // Filesystem name
+    CHAR16                    *VolName;                // One of two above OR fs desc (e.g., "2 GiB FAT volume")
+    UINT32                     VolRole;                // APFS_VOLUME_ROLE
     EFI_GUID                   VolUuid;
     EFI_GUID                   PartGuid;
     EFI_GUID                   PartTypeGuid;
@@ -456,11 +456,11 @@ typedef struct _refit_menu_entry {
 } REFIT_MENU_ENTRY;
 
 typedef struct _refit_menu_screen {
-    CHAR16                    *Title;             // EFI firmware entry ... Includes "Reboot to" prefix
+    CHAR16                    *Title;                    // EFI firmware entry ... Includes "Reboot to" prefix
     EG_IMAGE                  *TitleImage;
     UINTN                      InfoLineCount;
     CHAR16                   **InfoLines;
-    UINTN                      EntryCount;        // Total number of entries registered
+    UINTN                      EntryCount;               // Total number of entries registered
     REFIT_MENU_ENTRY         **Entries;
     INTN                       TimeoutSeconds;
     CHAR16                    *TimeoutText;
@@ -470,17 +470,17 @@ typedef struct _refit_menu_screen {
 
 typedef struct {
     REFIT_MENU_ENTRY            me;
-    CHAR16                     *Title;            // EFI firmware entry "raw" title
+    CHAR16                     *Title;                   // EFI firmware entry "raw" title
     CHAR16                     *LoaderPath;
     REFIT_VOLUME               *Volume;
     BOOLEAN                     UseGraphicsMode;
     BOOLEAN                     Enabled;
     CHAR16                     *LoadOptions;
-    CHAR16                     *InitrdPath;       // Linux stub loader
+    CHAR16                     *InitrdPath;              // Linux stub loader
     CHAR8                       OSType;
     UINTN                       DiscoveryType;
-    EFI_DEVICE_PATH_PROTOCOL   *EfiLoaderPath;    // Path to NVRAM-defined loader
-    UINT16                      EfiBootNum;       // Boot#### number for NVRAM-defined loader
+    EFI_DEVICE_PATH_PROTOCOL   *EfiLoaderPath;           // Path to NVRAM-defined loader
+    UINT16                      EfiBootNum;              // Boot#### number for NVRAM-defined loader
 } LOADER_ENTRY;
 
 typedef struct {
@@ -492,7 +492,7 @@ typedef struct {
 } LEGACY_ENTRY;
 
 typedef struct {
-    BOOLEAN                     BadRamFixWide;
+    BOOLEAN                     BadRamTagWide;
     BOOLEAN                     DirectBoot;
     BOOLEAN                     CustomScreenBG;
     BOOLEAN                     TextOnly;
@@ -568,14 +568,14 @@ typedef struct {
     INTN                        LogLevel;
     INTN                        IconRowMove;
     INTN                        IconRowTune;
-    INTN                        BadRamFixType;
+    INTN                        BadRamTagType;
     INTN                        ScreenR;
     INTN                        ScreenG;
     INTN                        ScreenB;
     REFIT_VOLUME               *DiscoveredRoot;
     EFI_DEVICE_PATH_PROTOCOL   *SelfDevicePath;
     EG_IMAGE                   *ScreenBackground;
-    CHAR16                     *BadRamFixList;
+    CHAR16                     *BadRamTagList;
     CHAR16                     *ToolLocations;
     CHAR16                     *ToolLocationsExtra;
     CHAR16                     *ConfigFilename;
@@ -595,8 +595,8 @@ typedef struct {
     CHAR16                     *DriverDirs;
     CHAR16                     *IconsDir;
     CHAR16                     *SetBootArgs;
-    CHAR16                     *LinuxPrefixes;      // Linux prefixes (e.g., L"vmlinuz,bzImage"
-    CHAR16                     *LinuxMatchPatterns; // Linux prefixes PLUS wildcards (e.g., L"vmlinuz*,bzImage*")
+    CHAR16                     *LinuxPrefixes;             // Linux prefixes (e.g., L"vmlinuz,bzImage"
+    CHAR16                     *LinuxMatchPatterns;        // Linux prefixes PLUS wildcards (e.g., L"vmlinuz*,bzImage*")
     CHAR16                     *ExtraKernelVersionStrings;
     CHAR16                     *SpoofOSXVersion;
     UINT32_LIST                *CsrValues;
@@ -706,6 +706,26 @@ EFI_STATUS GetHardwareNvramVariable (
 #define LOG_LINE_FORENSIC    (14)
 #define LOG_LINE_EXIT        (15)
 #define LOG_LINE_BASE        (16)
+
+
+// Message Printing - START
+#define OUR_MSG_STR(s) L##s
+#define OUR_MSG_OUT Print
+
+#define OUR_MSG_L00(params) OUR_MSG_OUT params
+
+#if REFIT_DEBUG >= 1
+#define OUR_MSG_L01(params) OUR_MSG_OUT params
+#else
+#define OUR_MSG_L01(params)
+#endif
+
+#if REFIT_DEBUG >= 2
+#define OUR_MSG_L02(params) OUR_MSG_OUT params
+#else
+#define OUR_MSG_L02(params)
+#endif
+// Message Printing - CLOSE
 
 VOID DeepLoggger (
     IN  INTN     level,
@@ -823,5 +843,3 @@ extern VOID EFIAPI DebugLog (
 
 
 #endif
-
-/* EOF */

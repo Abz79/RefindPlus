@@ -1,6 +1,6 @@
 /* Misc string encoding functions */
 
-/*
+/**
  * Copyright (c) 2006 Christoph Pfisterer
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,173 +30,247 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
-/*
- * Refactored for RefindPlus
- * Copyright (c) 2025 Dayo Akanji (sf.net/u/dakanji/profile)
- *
- * Modifications distributed under the MIT License.
- */
+**/
+/**
+** Refactored for RefindPlus
+** Copyright (c) 2025-2026 Dayo Akanji (sf.net/u/dakanji/profile)
+**
+** Modifications distributed under the MIT License.
+**/
 
-// Helper Functions - Compare
+
+// Internal Routing Constants
+#define FSW_ENC_88591_NORM   0
+#define FSW_ENC_UTF08_NORM   8
+#define FSW_ENC_UTF16_NORM  16
+#define FSW_ENC_UTF16_SWAP 161
+
+
+
+// ====================================================================
+// Internal Helpers
+// ====================================================================
+
+/* Reads a Single Unicode Codepoint from a UTF-8 Byte Stream */
 static
-fsw_u32 decode_utf8(
+fsw_u32 decode_utf8_char (
     fsw_u8 **p
 ) {
-    fsw_u32 c = *(*p)++;
+    fsw_u32 c = *(*p)++; // Correctly set for 1-byte sequences (0xxxxxxx)
+
+    // Check for 2-byte sequence (110xxxxx)
     if ((c & 0xe0) == 0xc0) {
-        fsw_u32 c1 = *(*p)++;
-        c = ((c & 0x1f) << 6) | (c1 & 0x3f);
+        c = ((c & 0x1f) << 6) | (*(*p)++ & 0x3f);
     }
+    // Check for 3-byte sequence (1110xxxx)
     else if ((c & 0xf0) == 0xe0) {
-        fsw_u32 c1 = *(*p)++;
-        fsw_u32 c2 = *(*p)++;
-        c = ((c & 0x0f) << 12) | ((c1 & 0x3f) << 6) | (c2 & 0x3f);
+        c = ((c & 0x0f) << 12) | ((*(*p)++ & 0x3f) << 6);
+        c |= (*(*p)++ & 0x3f);
     }
-    else if ((c & 0xf8) == 0xf0) {
-        fsw_u32 c1 = *(*p)++;
-        fsw_u32 c2 = *(*p)++;
-        fsw_u32 c3 = *(*p)++;
-        c = ((c & 0x07) << 18) | ((c1 & 0x3f) << 12) | ((c2 & 0x3f) << 6) | (c3 & 0x3f);
+    else {
+        // Check for 4-byte sequence (11110xxx)
+        if ((c & 0xf8) == 0xf0) {
+            c = ((c & 0x07) << 18) | ((*(*p)++ & 0x3f) << 12);
+            c |= ((*(*p)++ & 0x3f) << 6);
+            c |= ( *(*p)++ & 0x3f);
+        }
     }
+
     return c;
 }
 
+/* Universal Fetcher: Extracts Codepoint and Advances Source Pointer */
 static
-int compare_strings (
-    void    *s1data,
-    void    *s2data,
-    int      len,
-    int      encoding,
-    int      swap
+fsw_u32 fsw_fetch_codepoint (
+    void **p,
+    int type
 ) {
-    int      i;
-    fsw_u32  c1, c2;
-    fsw_u8  *p1 = (fsw_u8 *) s1data;
-    fsw_u16 *p2 = (fsw_u16 *)s2data;
+    fsw_u32 c;
 
-    for (i = 0; i < len; i++) {
-        c1 = (encoding == 1) ? decode_utf8 (&p1) : *p1++;
-        c2 = *p2++;
-        if (swap) {
-            c2 = FSW_SWAPVALUE_U16(c2);
+
+    if (type == FSW_ENC_UTF08_NORM) {
+        return decode_utf8_char (
+            (fsw_u8 **)p
+        );
+    }
+
+    if (type == FSW_ENC_UTF16_NORM ||
+        type == FSW_ENC_UTF16_SWAP
+    ) {
+        c = **((fsw_u16 **)p);
+        (*((fsw_u16 **)p))++;
+
+        if (type == FSW_ENC_UTF16_NORM) {
+            return c;
         }
 
-        if (c1 != c2) {
+        return FSW_SWAPVALUE_U16(c);
+    }
+
+    // Default: ISO-8859-1
+    c = **((fsw_u8 **)p);
+    (*((fsw_u8 **)p))++;
+
+    return c;
+}
+
+/* UTF-8 Encoder Helpers */
+static
+int fsw_utf8_size (
+    fsw_u32 c
+) {
+    if (c < 0x80   ) return 1;
+    if (c < 0x800  ) return 2;
+    if (c < 0x10000) return 3;
+
+    return 4;
+}
+
+static
+void fsw_write_utf8_char (
+    fsw_u8  **dp,
+    fsw_u32   c
+) {
+    if (c < 0x80) {
+        *(*dp)++ = (fsw_u8)c;
+    }
+    else if (c < 0x800) {
+        *(*dp)++ = (fsw_u8)(0xc0 | ((c >> 6 ) & 0x1f));
+        *(*dp)++ = (fsw_u8)(0x80 | ( c        & 0x3f));
+    }
+    else if (c < 0x10000) {
+        *(*dp)++ = (fsw_u8)(0xe0 | ((c >> 12) & 0x0f));
+        *(*dp)++ = (fsw_u8)(0x80 | ((c >> 6 ) & 0x3f));
+        *(*dp)++ = (fsw_u8)(0x80 | ( c        & 0x3f));
+    }
+    else {
+        *(*dp)++ = (fsw_u8)(0xf0 | ((c >> 18) & 0x07));
+        *(*dp)++ = (fsw_u8)(0x80 | ((c >> 12) & 0x3f));
+        *(*dp)++ = (fsw_u8)(0x80 | ((c >> 6 ) & 0x3f));
+        *(*dp)++ = (fsw_u8)(0x80 | ( c        & 0x3f));
+    }
+}
+
+
+
+// =================================================
+// Unified Comparison Handler (Ex 'fsw_streq_*')
+// =================================================
+
+static
+int fsw_streq_internal (
+    void *s1data,
+    void *s2data,
+    int   len,
+    int   t1,
+    int   t2
+) {
+    void *p1 = s1data;
+    void *p2 = s2data;
+
+
+    for (int i = 0; i < len; i++) {
+        if (fsw_fetch_codepoint (&p1, t1) !=
+            fsw_fetch_codepoint (&p2, t2)
+        ) {
             return 0;
         }
-    } // for
+    }
 
     return 1;
 }
-// Define Macro Base Functions - Compare
-#define FSW_STREQ_FUNC(name, encoding, swap) \
-static int name (void *s1data, void *s2data, int len) { \
-    return compare_strings (s1data, s2data, len, encoding, swap); \
-}
-// Create Base Functions - Compare
-FSW_STREQ_FUNC(fsw_streq_UTF8_UTF16, 1, 0)
-FSW_STREQ_FUNC(fsw_streq_ISO88591_UTF8, 1, 0)
-FSW_STREQ_FUNC(fsw_streq_ISO88591_UTF16, 0, 0)
-FSW_STREQ_FUNC(fsw_streq_UTF8_UTF16_SWAPPED, 1, 1)
-FSW_STREQ_FUNC(fsw_streq_UTF16_UTF16_SWAPPED, 0, 1)
-FSW_STREQ_FUNC(fsw_streq_ISO88591_UTF16_SWAPPED, 0, 1)
+
+// API Interface:- Comparison
+static int fsw_streq_UTF08_UTF16         (void *s1, void *s2, int l) { return fsw_streq_internal (s1, s2, l, FSW_ENC_UTF08_NORM, FSW_ENC_UTF16_NORM); }
+static int fsw_streq_ISO88591_UTF16      (void *s1, void *s2, int l) { return fsw_streq_internal (s1, s2, l, FSW_ENC_88591_NORM, FSW_ENC_UTF16_NORM); }
+static int fsw_streq_ISO88591_UTF08      (void *s1, void *s2, int l) { return fsw_streq_internal (s1, s2, l, FSW_ENC_88591_NORM, FSW_ENC_UTF08_NORM); }
+static int fsw_streq_ISO88591_UTF16_SWAP (void *s1, void *s2, int l) { return fsw_streq_internal (s1, s2, l, FSW_ENC_88591_NORM, FSW_ENC_UTF16_SWAP); }
+static int fsw_streq_UTF16_UTF16_SWAP    (void *s1, void *s2, int l) { return fsw_streq_internal (s1, s2, l, FSW_ENC_UTF16_NORM, FSW_ENC_UTF16_SWAP); }
+static int fsw_streq_UTF08_UTF16_SWAP    (void *s1, void *s2, int l) { return fsw_streq_internal (s1, s2, l, FSW_ENC_UTF08_NORM, FSW_ENC_UTF16_SWAP); }
 
 
-// Helper Function - Coerce
+
+// =================================================
+// Unified Coercion Handler (Ex 'fsw_strcoerce_*')
+// =================================================
+
 static
-fsw_status_t fsw_strcoerce_generic (
-    void              *srcdata,
-    int                srclen,
+fsw_status_t fsw_strcoerce_internal (
+    void              *src,
+    int                slen,
     struct fsw_string *dest,
-    int                src_type,
-    int                dest_type,
-    int                swap
+    int                stype,
+    int                dtype
 ) {
-    fsw_status_t       status;
-    int                destsize, i;
-    fsw_u8            *sp = (fsw_u8 *) srcdata;
-    fsw_u8            *dp;
-    fsw_u16           *dp16;
-    fsw_u32            c;
+    fsw_status_t status;
+    void *sp = src;
 
+    dest->len = slen;
 
-    destsize = 0;
+    if (dtype == FSW_ENC_UTF08_NORM) {
+        int dsize = 0;
+        for (int i = 0; i < slen; i++) {
+            dsize += fsw_utf8_size (
+                fsw_fetch_codepoint (
+                    &sp, stype
+                )
+            );
+        }
 
-    if (dest_type == FSW_STRING_TYPE_UTF8) {
-        for (i = 0; i < srclen; i++) {
-            c = *sp++;
-            if (0);
-            else if (c < 0x000080) destsize += 1;
-            else if (c < 0x000800) destsize += 2;
-            else if (c < 0x010000) destsize += 3;
-            else                   destsize += 4;
-        } // for
+        dest->type = FSW_STRING_TYPE_UTF08;
+        dest->size = dsize;
 
-        sp = (fsw_u8 *) srcdata;
+        status = FSW_DO_ALLOC(dest->size, &dest->data);
+        if (status) return status;
+
+        sp = src; fsw_u8 *dp = (fsw_u8 *)dest->data;
+        for (int i = 0; i < slen; i++) {
+            fsw_write_utf8_char (
+                &dp, fsw_fetch_codepoint (
+                    &sp, stype
+                )
+            );
+        }
     }
+    else if (dtype == FSW_ENC_UTF16_NORM) {
+        dest->type = FSW_STRING_TYPE_UTF16;
+        dest->size = slen * sizeof (fsw_u16);
 
-    dest->len  = srclen;
-    dest->type = dest_type;
-    dest->size = (dest_type == FSW_STRING_TYPE_UTF16)
-        ? srclen * sizeof (fsw_u16)
-        : (dest_type == FSW_STRING_TYPE_ISO88591)
-            ? srclen
-            : destsize; // FSW_STRING_TYPE_UTF8
+        status = FSW_DO_ALLOC(dest->size, &dest->data);
+        if (status) return status;
 
-    status = fsw_alloc (dest->size, &dest->data);
-    if (status) {
-        return status;
+        fsw_u16 *dp = (fsw_u16 *)dest->data;
+        for (int i = 0; i < slen; i++) {
+            *dp++ = (fsw_u16)fsw_fetch_codepoint (
+                &sp, stype
+            );
+        }
     }
+    else { // ISO-8859-1
+        dest->type = FSW_STRING_TYPE_ISO88591;
+        dest->size = slen;
 
-    dp   = (fsw_u8 *)  dest->data;
-    dp16 = (fsw_u16 *) dest->data;
+        status = FSW_DO_ALLOC(dest->size, &dest->data);
+        if (status) return status;
 
-    for (i = 0; i < srclen; i++) {
-        c = *sp++;
-        if (swap) {
-            c = FSW_SWAPVALUE_U16(c);
+        fsw_u8 *dp = (fsw_u8 *)dest->data;
+        for (int i = 0; i < slen; i++) {
+            *dp++ = (fsw_u8)fsw_fetch_codepoint (
+                &sp, stype
+            );
         }
-
-        if (dest_type == FSW_STRING_TYPE_UTF16) {
-            *dp16++ = (fsw_u16) c;
-        }
-        else {
-            if (c < 0x000080) {
-                *dp++ = (fsw_u8) c;
-            }
-            else if (c < 0x000800) {
-                *dp++ = (fsw_u8)(0xc0 | ((c >> 6) & 0x1f));
-                *dp++ = (fsw_u8)(0x80 | (c & 0x3f));
-            }
-            else if (c < 0x010000) {
-                *dp++ = (fsw_u8)(0xe0 | ((c >> 12) & 0x0f));
-                *dp++ = (fsw_u8)(0x80 | ((c >> 6) & 0x3f));
-                *dp++ = (fsw_u8)(0x80 | (c & 0x3f));
-            }
-            else {
-                *dp++ = (fsw_u8)(0xf0 | ((c >> 18) & 0x07));
-                *dp++ = (fsw_u8)(0x80 | ((c >> 12) & 0x3f));
-                *dp++ = (fsw_u8)(0x80 | ((c >> 6) & 0x3f));
-                *dp++ = (fsw_u8)(0x80 | (c & 0x3f));
-            }
-        }
-    } // for
+    }
 
     return FSW_SUCCESS;
 }
-// Define Macro Base Functions - Coerce
-#define FSW_STRCOERCE_FUNC(name, src_type, dest_type, swap) \
-static fsw_status_t name(void *srcdata, int srclen, struct fsw_string *dest) { \
-    return fsw_strcoerce_generic(srcdata, srclen, dest, src_type, dest_type, swap); \
-}
-// Create Base Functions - Coerce
-FSW_STRCOERCE_FUNC(fsw_strcoerce_UTF16_UTF8, FSW_STRING_TYPE_UTF16, FSW_STRING_TYPE_UTF8, 0)
-FSW_STRCOERCE_FUNC(fsw_strcoerce_UTF8_UTF16, FSW_STRING_TYPE_UTF8, FSW_STRING_TYPE_UTF16, 0)
-FSW_STRCOERCE_FUNC(fsw_strcoerce_ISO88591_UTF8, FSW_STRING_TYPE_ISO88591, FSW_STRING_TYPE_UTF8, 0)
-FSW_STRCOERCE_FUNC(fsw_strcoerce_UTF8_ISO88591, FSW_STRING_TYPE_UTF8, FSW_STRING_TYPE_ISO88591, 0)
-FSW_STRCOERCE_FUNC(fsw_strcoerce_UTF16_ISO88591, FSW_STRING_TYPE_UTF16, FSW_STRING_TYPE_ISO88591, 0)
-FSW_STRCOERCE_FUNC(fsw_strcoerce_ISO88591_UTF16, FSW_STRING_TYPE_ISO88591, FSW_STRING_TYPE_UTF16, 0)
-FSW_STRCOERCE_FUNC(fsw_strcoerce_UTF16_SWAPPED_UTF8, FSW_STRING_TYPE_UTF16, FSW_STRING_TYPE_UTF8, 1)
-FSW_STRCOERCE_FUNC(fsw_strcoerce_UTF16_SWAPPED_UTF16, FSW_STRING_TYPE_UTF16, FSW_STRING_TYPE_UTF16, 1)
-FSW_STRCOERCE_FUNC(fsw_strcoerce_UTF16_SWAPPED_ISO88591, FSW_STRING_TYPE_UTF16, FSW_STRING_TYPE_ISO88591, 1)
+
+// API Interface:- Coercion
+static fsw_status_t fsw_strcoerce_ISO88591_UTF16      (void *s, int l, struct fsw_string *d) { return fsw_strcoerce_internal (s, l, d, FSW_ENC_88591_NORM, FSW_ENC_UTF16_NORM); }
+static fsw_status_t fsw_strcoerce_ISO88591_UTF08      (void *s, int l, struct fsw_string *d) { return fsw_strcoerce_internal (s, l, d, FSW_ENC_88591_NORM, FSW_ENC_UTF08_NORM); }
+static fsw_status_t fsw_strcoerce_UTF08_ISO88591      (void *s, int l, struct fsw_string *d) { return fsw_strcoerce_internal (s, l, d, FSW_ENC_UTF08_NORM, FSW_ENC_88591_NORM); }
+static fsw_status_t fsw_strcoerce_UTF08_UTF16         (void *s, int l, struct fsw_string *d) { return fsw_strcoerce_internal (s, l, d, FSW_ENC_UTF08_NORM, FSW_ENC_UTF16_NORM); }
+static fsw_status_t fsw_strcoerce_UTF16_UTF08         (void *s, int l, struct fsw_string *d) { return fsw_strcoerce_internal (s, l, d, FSW_ENC_UTF16_NORM, FSW_ENC_UTF08_NORM); }
+static fsw_status_t fsw_strcoerce_UTF16_ISO88591      (void *s, int l, struct fsw_string *d) { return fsw_strcoerce_internal (s, l, d, FSW_ENC_UTF16_NORM, FSW_ENC_88591_NORM); }
+static fsw_status_t fsw_strcoerce_UTF16_SWAP_UTF08    (void *s, int l, struct fsw_string *d) { return fsw_strcoerce_internal (s, l, d, FSW_ENC_UTF16_SWAP, FSW_ENC_UTF08_NORM); }
+static fsw_status_t fsw_strcoerce_UTF16_SWAP_UTF16    (void *s, int l, struct fsw_string *d) { return fsw_strcoerce_internal (s, l, d, FSW_ENC_UTF16_SWAP, FSW_ENC_UTF16_NORM); }
+static fsw_status_t fsw_strcoerce_UTF16_SWAP_ISO88591 (void *s, int l, struct fsw_string *d) { return fsw_strcoerce_internal (s, l, d, FSW_ENC_UTF16_SWAP, FSW_ENC_88591_NORM); }
