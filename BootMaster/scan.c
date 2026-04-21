@@ -5793,7 +5793,7 @@ VOID ScanForTools (VOID) {
                     #endif
 
                     MenuEntryPreCleanNvram->Title = PoolPrint (
-                        L"%s", ToolName
+                        L"Show '%s' Menu", ToolName
                     );
                     MenuEntryPreCleanNvram->Tag         = TAG_CLEAN_NVRAM;
                     MenuEntryPreCleanNvram->Row         = 1;
@@ -5927,7 +5927,7 @@ VOID ScanForTools (VOID) {
                     #endif
 
                     MenuEntryAbout->Title = PoolPrint (
-                        L"%s", ToolName
+                        L"Show '%s' Menu", ToolName
                     );
                     MenuEntryAbout->Tag         = TAG_ABOUT;
                     MenuEntryAbout->Row         =  1;
@@ -6039,7 +6039,7 @@ VOID ScanForTools (VOID) {
                     }
 
                     MenuEntryHiddenTags->Title = PoolPrint (
-                        L"%s", ToolName
+                        L"Show '%s' Menu", ToolName
                     );
                     MenuEntryHiddenTags->Tag         = TAG_HIDDEN;
                     MenuEntryHiddenTags->Row         = 1;
@@ -6141,7 +6141,7 @@ VOID ScanForTools (VOID) {
                     #endif
 
                     MenuEntryPreShellEFI->Title = PoolPrint (
-                        L"%s", ToolName
+                        L"Show '%s' Menu", ToolName
                     );
                     MenuEntryPreShellEFI->Tag         = TAG_SHELL;
                     MenuEntryPreShellEFI->Row         = 1;
@@ -6187,7 +6187,7 @@ VOID ScanForTools (VOID) {
                     #endif
 
                     MenuEntryPreGPTSync->Title = PoolPrint (
-                        L"%s", ToolName
+                        L"Show '%s' Menu", ToolName
                     );
                     MenuEntryPreGPTSync->Tag         = TAG_GPTSYNC;
                     MenuEntryPreGPTSync->Row         = 1;
@@ -6233,7 +6233,7 @@ VOID ScanForTools (VOID) {
                     #endif
 
                     MenuEntryPreGDiskTool->Title = PoolPrint (
-                        L"%s", ToolName
+                        L"Show '%s' Menu", ToolName
                     );
                     MenuEntryPreGDiskTool->Tag         = TAG_GDISK;
                     MenuEntryPreGDiskTool->Row         = 1;
@@ -6279,7 +6279,7 @@ VOID ScanForTools (VOID) {
                     #endif
 
                     MenuEntryPreMokTool->Title = PoolPrint (
-                        L"%s", ToolName
+                        L"Show '%s' Menu", ToolName
                     );
                     MenuEntryPreMokTool->Tag         = TAG_MOK;
                     MenuEntryPreMokTool->Row         = 1;
@@ -6325,7 +6325,7 @@ VOID ScanForTools (VOID) {
                     #endif
 
                     MenuEntryPreFwUpdateTool->Title = PoolPrint (
-                        L"%s", ToolName
+                        L"Show '%s' Menu", ToolName
                     );
                     MenuEntryPreFwUpdateTool->Tag         = TAG_FWUPDATE;
                     MenuEntryPreFwUpdateTool->Row         = 1;
@@ -6371,7 +6371,7 @@ VOID ScanForTools (VOID) {
                     #endif
 
                     MenuEntryPreNetBoot->Title = PoolPrint (
-                        L"%s", ToolName
+                        L"Show '%s' Menu", ToolName
                     );
                     MenuEntryPreNetBoot->Tag         = TAG_NETBOOT;
                     MenuEntryPreNetBoot->Row         = 1;
@@ -6413,7 +6413,7 @@ VOID ScanForTools (VOID) {
                     #endif
 
                     MenuEntryPreRecoveryMac->Title = PoolPrint (
-                        L"%s", ToolName
+                        L"Show '%s' Menu", ToolName
                     );
                     MenuEntryPreRecoveryMac->Tag         = TAG_RECOVERY_MAC;
                     MenuEntryPreRecoveryMac->Row         = 1;
@@ -6459,7 +6459,7 @@ VOID ScanForTools (VOID) {
                     #endif
 
                     MenuEntryPreRecoveryWin->Title = PoolPrint (
-                        L"%s", ToolName
+                        L"Show '%s' Menu", ToolName
                     );
                     MenuEntryPreRecoveryWin->Tag         = TAG_RECOVERY_WIN;
                     MenuEntryPreRecoveryWin->Row         = 1;
@@ -6564,7 +6564,7 @@ VOID ScanForTools (VOID) {
                 }
 
                 MenuEntryRotateCSR->Title = PoolPrint (
-                    L"%s", ToolName
+                    L"Show '%s' Menu", ToolName
                 );
                 MenuEntryRotateCSR->Tag         = TAG_CSR_ROTATE;
                 MenuEntryRotateCSR->Row         = 1;
@@ -6629,7 +6629,7 @@ VOID ScanForTools (VOID) {
                 }
 
                 MenuEntryBootOrder->Title = PoolPrint (
-                    L"%s", ToolName
+                    L"Show '%s' Menu", ToolName
                 );
                 MenuEntryBootOrder->Tag         = TAG_BOOTORDER;
                 MenuEntryBootOrder->Row         = 1;
@@ -6659,7 +6659,7 @@ VOID ScanForTools (VOID) {
                     #endif
 
                     MenuEntryPreMemTest->Title = PoolPrint (
-                        L"%s", ToolName
+                        L"Show '%s' Menu", ToolName
                     );
                     MenuEntryPreMemTest->Tag         = TAG_MEMTEST;
                     MenuEntryPreMemTest->Row         = 1;

@@ -18,12 +18,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-/**
-** Modified for RefindPlus
-** Copyright (c) 2020-2026 Dayo Akanji (sf.net/u/dakanji/profile)
-**
-** Modifications distributed under the preceding terms.
-**/
+/*
+ * Modified for RefindPlus
+ * Copyright (c) 2020-2025 Dayo Akanji (sf.net/u/dakanji/profile)
+ *
+ * Modifications distributed under the preceding terms.
+ */
 
 #include "global.h"
 #include "pointer.h"
@@ -54,8 +54,8 @@ BOOLEAN                         gPointerActuallyMoved =                         
 POINTER_STATE                   State;
 
 extern BOOLEAN                  RunningOC;
-BOOLEAN gSuppressPointerDraw = TRUE;
-BOOLEAN gPointerActuallyMoved = FALSE;
+
+
 ////////////////////////////////////////////////////////////////////////////////
 // Frees allocated memory and closes pointer protocols
 ////////////////////////////////////////////////////////////////////////////////
@@ -79,6 +79,7 @@ VOID pdCleanup (VOID) {
     }
 
     pdClear ();
+
     if (HandleA != NULL) {
         for (Index = 0; Index < NumAPointerDevices; Index++) {
             REFIT_CALL_4_WRAPPER(
@@ -103,13 +104,14 @@ VOID pdCleanup (VOID) {
     LastYPos = (
         ScreenH > 1
     ) ? ScreenH / 2 : ScreenH;
-    LastXPos = ScreenW / 2;
-    LastYPos = ScreenH / 2;
 
-    State.X  = ScreenW / 2;
-    State.Y  = ScreenH / 2;
-    State.Press    = FALSE;
-    State.Holding  = FALSE;
+    State.X        = LastXPos;
+    State.Y        = LastYPos;
+    State.Press    =    FALSE;
+    State.Holding  =    FALSE;
+
+    NumAPointerDevices    = 0;
+    NumSPointerDevices    = 0;
 
     #if REFIT_DEBUG > 0
     MsgStr = L"Disable Pointer Protocols ... Success";
@@ -122,7 +124,9 @@ VOID pdCleanup (VOID) {
     MY_FREE_POOL(ProtocolA);
     MY_FREE_POOL(ProtocolS);
     MY_FREE_IMAGE(MouseImage);
-} // static VOID pdCleanup()////////////////////////////////////////////////////////////////////////////////
+} // static VOID pdCleanup()
+
+////////////////////////////////////////////////////////////////////////////////
 // Initialise Pointer Devices
 ////////////////////////////////////////////////////////////////////////////////
 VOID pdInitialize (VOID) {
@@ -329,7 +333,7 @@ VOID pdInitialize (VOID) {
             );
         }
 
-        // Form below is Deliberate for RunningOC
+        // Form below is delibrate for RunningOC
         MouseTouchActive = (
             GlobalConfig.EnableMouse ||
             GlobalConfig.EnableTouch
@@ -476,6 +480,7 @@ BOOLEAN pdNotUsed (VOID) {
     return (!PointerAvailable || !MouseTouchActive);
 } // static BOOLEAN pdNotUsed()
 */
+
 EFI_STATUS pdUpdateState (VOID) {
     EFI_STATUS                 Status;
     UINTN                      Index;
@@ -486,11 +491,7 @@ EFI_STATUS pdUpdateState (VOID) {
     BOOLEAN                    LastHolding;
     EFI_SIMPLE_POINTER_STATE   SPointerState;
     EFI_ABSOLUTE_POINTER_STATE APointerState;
-    gPointerActuallyMoved = FALSE;
 
-    #if defined (EFI32) && defined (__MAKEWITH_GNUEFI)
-    return EFI_NOT_READY;
-    #endif
 
     Status = EFI_NOT_READY;
 
@@ -501,6 +502,7 @@ EFI_STATUS pdUpdateState (VOID) {
     if (!PointerAvailable) {
         return Status;
     }
+
     LastHolding = State.Holding;
 
     do {
@@ -583,13 +585,7 @@ EFI_STATUS pdUpdateState (VOID) {
         } // for
     } while (0); // This 'loop' only runs once
 
-    State.Press = (!LastHolding && State.Holding); // Detects a BUTTON PRESS (button just went down)
-    if (State.X != LastXPos || State.Y != LastYPos) { // Mouse has moved
-        gPointerActuallyMoved = TRUE; // Set the flag to TRUE
-        if (gSuppressPointerDraw) { // If pointer was suppressed (hidden)
-            gSuppressPointerDraw = FALSE; // Show the pointer
-        }
-    }
+    State.Press = (LastHolding && !State.Holding);
 
     if (State.X != LastXPos || State.Y != LastYPos) {
         gPointerActuallyMoved = TRUE;
@@ -629,8 +625,6 @@ VOID pdDraw (VOID) {
     UINTN Width;
     UINTN Height;
 
-    if (!MouseTouchActive) {        return;
-    }
 
     if (!MouseTouchActive) {
         return;
@@ -642,7 +636,8 @@ VOID pdDraw (VOID) {
 
     if (Background != NULL) {
         egDrawImage (Background, LastXPos, LastYPos);
-        MY_FREE_IMAGE(Background);    }
+        MY_FREE_IMAGE(Background);
+    }
 
     if (MouseImage != NULL) {
         Width = (
@@ -651,16 +646,17 @@ VOID pdDraw (VOID) {
         Height = (
             (State.Y + MouseImage->Height) > ScreenH
         ) ? ScreenH - State.Y : MouseImage->Height;
-    MY_FREE_IMAGE(Background);
-    Background = egCopyScreenArea (
-        State.X, State.Y,
-        Width, Height
-    );
-    if (Background != NULL) {
-        BltImageCompositeAny (
-            Background, MouseImage,
-            NULL, State.X, State.Y
+
+        Background = egCopyScreenArea (
+            State.X, State.Y,
+            Width, Height
         );
+        if (Background != NULL) {
+            BltImageCompositeAny (
+                Background, MouseImage,
+                NULL, State.X, State.Y
+            );
+        }
     }
 
     LastXPos = State.X;
