@@ -39,13 +39,13 @@
  * Modifications distributed under the terms of the GNU General Public
  * License (GPL) version 3 (GPLv3), or (at your option) any later version.
  */
-/*
- * Modified for RefindPlus
- * Copyright (c) 2020-2025 Dayo Akanji (sf.net/u/dakanji/profile)
- * Portions Copyright (c) 2021 Joe van Tunen (joevt@shaw.ca)
- *
- * Modifications distributed under the preceding terms.
- */
+/**
+ ** Modified for RefindPlus
+ ** Copyright (c) 2020-2026 Dayo Akanji (sf.net/u/dakanji/profile)
+ ** Portions Copyright (c) 2021 Joe van Tunen (joevt@shaw.ca)
+ **
+ ** Modifications distributed under the preceding terms.
+ **/
 #include "pointer.h"
 #include "global.h"
 #include "menu.h"
@@ -2901,7 +2901,7 @@ VOID TextMenuStyle (
 
     switch (Function) {
         case MENU_FUNCTION_INIT:
-            // Vertical layout
+            // Vertical Layout
             MenuPosY = 4;
             if (Screen->InfoLineCount > 0) {
                 MenuPosY += Screen->InfoLineCount + 1;
@@ -2913,7 +2913,7 @@ VOID TextMenuStyle (
             }
             InitScroll (State, Screen->EntryCount, MenuHeight);
 
-            // Determine menu width ... Minimum = 20
+            // Determine Menu Width ... Minimum = 20
             MenuWidth = 20;
 
             for (i = 0; i <= State->MaxIndex; i++) {
@@ -2932,7 +2932,7 @@ VOID TextMenuStyle (
                 MenuWidth = i;
             }
 
-            // Prepare strings for display
+            // Prepare Strings for Display
             DisplayStrings = AllocatePool (
                 Screen->EntryCount * sizeof (CHAR16 *)
             );
@@ -2968,7 +2968,7 @@ VOID TextMenuStyle (
 
         break;
         case MENU_FUNCTION_CLEANUP:
-            // Release temporary memory
+            // Release Temp Memory
             for (i = 0; i <= State->MaxIndex; i++) {
                 MY_FREE_POOL(DisplayStrings[i]);
             }
@@ -2976,7 +2976,7 @@ VOID TextMenuStyle (
 
         break;
         case MENU_FUNCTION_PAINT_ALL:
-            // Paint the whole screen (initially and after scrolling)
+            // Paint Whole Screen ... Initially and After Scrolling
             ShowTextInfoLines (Screen);
             for (i = 0; i <= State->MaxIndex; i++) {
                 if (i >= State->FirstVisible && i <= State->LastVisible) {
@@ -3006,7 +3006,7 @@ VOID TextMenuStyle (
                 }
             }
 
-            // Scrolling indicators
+            // Scrolling Indicators
             REFIT_CALL_2_WRAPPER(
                 gST->ConOut->SetAttribute,
                 gST->ConOut, ATTR_SCROLLARROW
@@ -3067,7 +3067,7 @@ VOID TextMenuStyle (
 
         break;
         case MENU_FUNCTION_PAINT_SELECTION:
-            // Redraw selection cursor
+            // Redraw Selection Cursor
             REFIT_CALL_3_WRAPPER(
                 gST->ConOut->SetCursorPosition, gST->ConOut,
                 2, MenuPosY + (State->PreviousSelection - State->FirstVisible)
@@ -3116,7 +3116,7 @@ VOID TextMenuStyle (
                 );
             }
             else {
-                // Paint or update message
+                // Paint or Update Message
                 REFIT_CALL_2_WRAPPER(
                     gST->ConOut->SetAttribute,
                     gST->ConOut, ATTR_ERROR
@@ -3167,7 +3167,7 @@ VOID GraphicsMenuStyle (
 
     switch (Function) {
         case MENU_FUNCTION_CLEANUP:
-            // Nothing to do
+            // Nothing To Do Here
         break;
         case MENU_FUNCTION_INIT:
             InitScroll (State, Screen->EntryCount, 0);
@@ -3185,7 +3185,7 @@ VOID GraphicsMenuStyle (
             #if REFIT_DEBUG > 0
             MY_MUTELOGGER_SET;
             #endif
-            // Initial painting
+            // Initial Painting
             SwitchToGraphicsAndClear (TRUE);
             #if REFIT_DEBUG > 0
             MY_MUTELOGGER_OFF;
@@ -3255,7 +3255,7 @@ VOID GraphicsMenuStyle (
                     EntriesPosY += TextLineHeight();
                 }
 
-                // Also add a blank line
+                // Also Add a Blank Line
                 EntriesPosY += TextLineHeight();
             }
 
@@ -3293,7 +3293,7 @@ VOID GraphicsMenuStyle (
 
         break;
         case MENU_FUNCTION_PAINT_SELECTION:
-            // Redraw selection cursor
+            // Redraw Selection Cursor
             DrawText (
                 Screen->Entries[State->PreviousSelection]->Title,
                 FALSE, LineWidth,
@@ -3350,11 +3350,11 @@ UINTN ComputeRow0PosY (
     INTN  IconRowTweak;
 
 
-    // Default IconRowTweak to zero
+    // Default 'IconRowTweak' to Zero
     // Keeps rows in central position
     IconRowTweak = 0;
 
-    // Amend IconRowTweak if 'ApplyOffset' is active
+    // Amend 'IconRowTweak' if 'ApplyOffset' is Active
     if (ApplyOffset) {
         if (GlobalConfig.IconRowMove != 0) {
             // Set positive value
@@ -3373,18 +3373,18 @@ UINTN ComputeRow0PosY (
         }
     }
 
-    // Set base row position
+    // Set Base Row Position
     // Adds 'IconRowTweak' value (which may be zero)
     Row0PosY = ((ScreenH / 2) - (TileSizes[0] / 2)) + IconRowTweak;
 
-    // Amend row position if 'ApplyOffset' is active
+    // Amend Row Position if 'ApplyOffset' is Active
     if (ApplyOffset) {
-        // Amend row position
+        // Amend Row Position
         // Adds 'icon_row_tune' value (which may be zero)
         Row0PosY += GlobalConfig.IconRowTune;
     }
 
-    // Return row position
+    // Return Row Position
     return Row0PosY;
 } // UINTN ComputeRow0PosY()
 
@@ -3450,7 +3450,7 @@ VOID MainMenuStyle (
                 }
             } // for
 
-            // Initial painting
+            // Initial Painting
             InitSelection();
 
             #if REFIT_DEBUG > 0
