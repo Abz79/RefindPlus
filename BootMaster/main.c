@@ -5409,7 +5409,7 @@ EFI_STATUS EFIAPI efi_main (
                             LOG_MSG(" from %s", EntryVol->VolName);
                         }
                         else {
-                            LOG_MSG(" from '%s' Partition", EntryVol->VolName);
+                            LOG_MSG("%s", EntryVol->VolName);
                         }
                     }
                     MY_FREE_POOL(MsgStr);
