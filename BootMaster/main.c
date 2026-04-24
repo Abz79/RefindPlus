@@ -4000,12 +4000,16 @@ EFI_STATUS EFIAPI efi_main (
     OurFlagTag = L" (Local)";
 
     // Set TypeTag
-    #if defined(__APPLE__)
+    #if defined(__BUILDING_ON_WINDOWS__)
+        OurTypeTag = L"Windows";
+    #elif defined(__APPLE__)
         OurTypeTag = L"macOS";
     #elif defined(__linux__)
         OurTypeTag = L"Linux";
     #elif defined(__FreeBSD__)
         OurTypeTag = L"FreeBSD";
+    #elif defined(_WIN32) || defined(WIN32)
+        OurTypeTag = L"Windows";
     #elif defined(__unix__) || defined(__MACH__)
         OurTypeTag = L"SomeBSD";
     #else
