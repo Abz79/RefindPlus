@@ -62,7 +62,7 @@
 #include "../include/refit_call_wrapper.h"
 
 //
-// constants
+// Constants
 
 #ifdef __MAKEWITH_GNUEFI
 #   ifndef EFI_SECURITY_VIOLATION
@@ -80,14 +80,17 @@
 #   define EFI_STUB_ARCH        0x0000000000004550 /* Type Unknown */
 #endif
 
+/* EFI_ARCH_FLAG is Bytes 4 and 5 of EFI_STUB_ARCH */
+#define EFI_ARCH_FLAG ((UINT16)(EFI_STUB_ARCH >> 32))
+
 /* ID for Apple's "Fat" Binaries */
 #define APPLE_FAT_BINARY        0x0ef1fab9
 
 /*
  * From linux/include/linux/pe.h in Linux Kernel:
- * LINUX_PE_MAGIC appears at offset 0x38 into the MS-DOS header of EFI bootable
- * Linux kernel images that target the architecture as specified by the PE/COFF
- * header machine type field.
+ * LINUX_PE_MAGIC is at offset 0x38 into the MS-DOS header of
+ * EFI bootable Linux kernel images that target architectures
+ * specified by the PE/COFF header machine type field.
  */
 #define LINUX_PE_MAGIC	        0x818223cd
 #define LINUX_PE_OFFSET         0x38
@@ -400,6 +403,7 @@ BOOLEAN IsValidLoader (
     BOOLEAN          AppleBinaryFat;
     UINT32           LinuxMagicPE;
     UINT32           BaseMagicPE;
+    UINT16           TheFileArch;
     UINTN            LoadedSize;
     CHAR8           *Header;
     UINT64           PESig;
@@ -442,7 +446,7 @@ BOOLEAN IsValidLoader (
 
             //LoaderType = LOADER_TYPE_INVALID;
 
-            break;
+            break; // Outer
         }
 
         Status = REFIT_CALL_5_WRAPPER(
@@ -457,12 +461,11 @@ BOOLEAN IsValidLoader (
 
             //LoaderType = LOADER_TYPE_INVALID;
 
-            break;
+            break; // Outer
         }
 
-        LoadedSize = EFI_HEADER_SIZE;
-
         // Read FileHandle Header
+        LoadedSize = EFI_HEADER_SIZE;
         Status = REFIT_CALL_3_WRAPPER(
             FileHandle->Read, FileHandle,
             &LoadedSize, Header
@@ -475,7 +478,7 @@ BOOLEAN IsValidLoader (
 
             //LoaderType = LOADER_TYPE_INVALID;
 
-            break;
+            break; // Outer
         }
 
         // Search for indications that subject is a gzipped file.
@@ -492,7 +495,7 @@ BOOLEAN IsValidLoader (
 
             //LoaderType = LOADER_TYPE_GZIP;
 
-            break;
+            break; // Outer
         }
 
 
@@ -501,44 +504,56 @@ BOOLEAN IsValidLoader (
         do {
             // Search for Common PE Signatures and Sizes
             ValidFile = (
-                Header[0]  == 'M' &&
-                Header[1]  == 'Z' &&
-                LoadedSize ==  EFI_HEADER_SIZE
+                Header[0] == 'M' &&
+                Header[1] == 'Z'
             );
             if (ValidFile) {
+                ValidFile = FALSE;
+
                 // Search for Standard PE32+ Signature
                 PESig = EFI_STUB_ARCH;
                 REFIT_CALL_3_WRAPPER(
                     gBS->CopyMem, &BaseMagicPE,
                     &Header[BASIC_PE_OFFSET], sizeof (UINT32)
                 ); // Safely Read Basic PE Magic
+                if (BaseMagicPE >= (EFI_HEADER_SIZE - 8)) {
+                    // Out of Bounds
+                    break; // Inner
+                }
+
                 ValidFile = (
-                    BaseMagicPE < (EFI_HEADER_SIZE - 8) &&
                     CompareMem (
                         &Header[BaseMagicPE], &PESig, 6
                     ) == 0
                 );
-                if (ValidFile) break;
-            }
+                if (ValidFile) break; // Inner
 
-            // Check for Linux EFI Bootable Kernel Image
-            REFIT_CALL_3_WRAPPER(
-                gBS->CopyMem, &LinuxMagicPE,
-                &Header[LINUX_PE_OFFSET], sizeof (UINT32)
-            ); // Safely Read Linux PE Magic
-            ValidFile = (
-                LinuxMagicPE == LINUX_PE_MAGIC
-            );
+                // Check for Linux EFI Bootable Kernel Image
+                //
+                // Fallback for Linux kernel images with EFI stub.
+                // LINUX_PE_MAGIC is architecture independent and the
+                // actual arch is in the PE/COFF header 'Machine' field.
+                REFIT_CALL_3_WRAPPER(
+                    gBS->CopyMem, &LinuxMagicPE,
+                    &Header[LINUX_PE_OFFSET], sizeof (UINT32)
+                ); // Safely Read Linux PE Magic
+                if (LinuxMagicPE == LINUX_PE_MAGIC) {
+                    REFIT_CALL_3_WRAPPER(
+                        gBS->CopyMem, &TheFileArch,
+                        &Header[BaseMagicPE + 4], sizeof (UINT16)
+                    ); // Safely Read Machine Type
+                    ValidFile = (TheFileArch == EFI_ARCH_FLAG);
+                }
+            }
         } while (0); // This 'loop' only runs once ... Inner
         /* INNER - END */
-
-
-
         if (ValidFile) {
             //LoaderType = LOADER_TYPE_EFI;
 
-            break;
+            break; // Outer
         }
+
+
 
         // Search for Apple's 'Fat' Binary Signature
         ValidFile = AppleBinaryFat = (
@@ -547,7 +562,7 @@ BOOLEAN IsValidLoader (
         if (ValidFile) {
             //LoaderType = LOADER_TYPE_EFI;
 
-            break;
+            break; // Outer
         }
 
         // Allow Plain Binaries on Apple Firmware
@@ -555,7 +570,7 @@ BOOLEAN IsValidLoader (
         if (ValidFile) {
             //LoaderType = LOADER_TYPE_EFI;
 
-            break;
+            break; // Outer
         }
 
         // Unknown ... Invalid
@@ -724,10 +739,10 @@ EFI_STATUS StartEFIImage (
     if (Verbose) {
         ShowErrorUglyText (MsgStr, NEXTLINE);
     }
-
     MY_FREE_POOL(MsgStr);
 
-    do {
+
+    do {  // OUTER
         ChildImageHandle = NULL;
         TempImageHandle  = NULL;
         BootLogoImage    = NULL;
@@ -762,7 +777,7 @@ EFI_STATUS StartEFIImage (
             MY_FREE_POOL(MsgStr);
 
             // Bail Out
-            break;
+            break;  // OUTER
         }
 
         DevicePath = FileDevicePath (
@@ -778,7 +793,7 @@ EFI_STATUS StartEFIImage (
             MY_FREE_POOL(MsgStr);
 
             // Bail Out
-            break;
+            break;  // OUTER
         }
 
         #if REFIT_DEBUG < 1
@@ -838,7 +853,7 @@ EFI_STATUS StartEFIImage (
             }
 
             // Unload and Bail Out
-            break;
+            break;  // OUTER
         }
 
         if (SecureFlag && ShimFound) {
@@ -872,7 +887,8 @@ EFI_STATUS StartEFIImage (
             );
         }
 
-        do {
+
+        do {  // INNER
             ChildLoadedImage = NULL;
             ReturnStatus = REFIT_CALL_3_WRAPPER(
                 gBS->HandleProtocol, ChildImageHandle,
@@ -885,16 +901,16 @@ EFI_STATUS StartEFIImage (
                 );
 
                 // Unload and Bail Out
-                break;
+                break;  // INNER
             }
 
+            // DA-TAG: Investigate This
+            //         Optionally Re-enable the EFI watchdog timer
             ChildLoadedImage->LoadOptions     = (VOID *) FullLoadOptions;
             ChildLoadedImage->LoadOptionsSize = (
                 FullLoadOptions != NULL
             ) ? (UINT32) StrSize (FullLoadOptions) : 0;
 
-            // DA-TAG: Investigate This
-            //         Optionally Re-enable the EFI watchdog timer
             if (IsBoot) {
                 ShowLogoLin = (
                     !Verbose &&
@@ -910,17 +926,21 @@ EFI_STATUS StartEFIImage (
                 ExitLogoFlag = (ShowLogoLin || ShowLogoWin);
                 if (ExitLogoFlag) {
                     if (ScreenW > 1024 && ScreenH > 1024) {
-                        // Stash current size
+                        // Stash Current Size
                         OrigIconBig = GlobalConfig.IconSizes[ICON_SIZE_BIG];
 
-                        // Set scale factor
+                        // Set Scale Factor
                         if (0);
-                        else if (OrigIconBig >= 256) ScaleLogo = 1;
-                        else if (OrigIconBig >= 128) ScaleLogo = 2;
-                        else if (OrigIconBig >=  64) ScaleLogo = 4;
-                        else                         ScaleLogo = 8;
+                        else if (OrigIconBig <   5) ScaleLogo = 128;
+                        else if (OrigIconBig <   9) ScaleLogo =  64;
+                        else if (OrigIconBig <  17) ScaleLogo =  32;
+                        else if (OrigIconBig <  33) ScaleLogo =  16;
+                        else if (OrigIconBig <  65) ScaleLogo =   8;
+                        else if (OrigIconBig < 129) ScaleLogo =   4;
+                        else if (OrigIconBig < 257) ScaleLogo =   2;
+                        else                        ScaleLogo =   1;
 
-                        // Apply scale factor
+                        // Apply Scale Factor
                         GlobalConfig.IconSizes[ICON_SIZE_BIG] *= ScaleLogo;
                     }
 
@@ -983,7 +1003,9 @@ EFI_STATUS StartEFIImage (
                     ExitLogoFlag = FALSE;
                 } // if ExitLogoFlag
 
-                if (GlobalConfig.WriteSystemdVars && OSType == 'L') {
+                if (GlobalConfig.WriteSystemdVars &&
+                    (OSType == 'S' || OSType == 'G')
+                ) {
                     // Inform SystemD of RefindPlus ESP
                     EspGUID = GuidAsString (
                         &(SelfVolume->PartGuid)
@@ -1149,7 +1171,8 @@ EFI_STATUS StartEFIImage (
 
             // Re-open file handles
             ReinitRefitLib();
-        } while (0); // This 'loop' only runs once
+        } while (0); // This 'loop' only runs once - INNER
+
 
         // DA-TAG: bailout_unload:
         if (!IsDriver) {
@@ -1160,7 +1183,8 @@ EFI_STATUS StartEFIImage (
                 gBS->UnloadImage, TempImageHandle
             );
         }
-    } while (0); // This 'loop' only runs once
+    } while (0); // This 'loop' only runs once - OUTER
+
 
     // DA-TAG: bailout:
     MY_FREE_POOL(FullLoadOptions);

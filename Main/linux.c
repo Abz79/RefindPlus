@@ -760,6 +760,11 @@ VOID GuessLinuxDistribution (
         LOG_DECREMENT();
         LOG_SEP(L"X");
 
+        if (Volume->OSIconName == NULL) {
+            Volume->OSIconName = StrDuplicate (*ReturnTag);
+            ToLower (Volume->OSIconName);
+        }
+
         return;
     }
 
@@ -769,6 +774,7 @@ VOID GuessLinuxDistribution (
         BREAD_CRUMB(L"%a:  5a 1 - Fedora Loader", __func__);
         if (FirstOnly) {
             BREAD_CRUMB(L"%a:  5a 1a 1", __func__);
+            MY_FREE_POOL(*ReturnTag);
             *ReturnTag = StrDuplicate (
                 L"Fedora"
             );
@@ -787,6 +793,7 @@ VOID GuessLinuxDistribution (
         BREAD_CRUMB(L"%a:  5b 1 - RedHat Loader", __func__);
         if (FirstOnly) {
             BREAD_CRUMB(L"%a:  5b 1a 1", __func__);
+            MY_FREE_POOL(*ReturnTag);
             *ReturnTag = StrDuplicate (
                 L"RedHat"
             );
@@ -819,6 +826,7 @@ VOID GuessLinuxDistribution (
                 Found = TRUE;
 
                 if (FirstOnly) {
+                    MY_FREE_POOL(*ReturnTag);
                     *ReturnTag = StrDuplicate (
                         ShowName
                     );
@@ -835,6 +843,7 @@ VOID GuessLinuxDistribution (
                 Found = TRUE;
 
                 if (FirstOnly) {
+                    MY_FREE_POOL(*ReturnTag);
                     *ReturnTag = StrDuplicate (
                         LinuxName
                     );
@@ -852,8 +861,13 @@ VOID GuessLinuxDistribution (
         BREAD_CRUMB(L"%a:  5c 2", __func__);
     }
 
+    if (Volume->OSIconName == NULL && *ReturnTag != NULL) {
+        Volume->OSIconName = StrDuplicate (*ReturnTag);
+        ToLower (Volume->OSIconName);
+    }
+
     BREAD_CRUMB(L"%a:  6 - END:- ReturnTagList = %s", __func__,
-        (*ReturnTag) ? *ReturnTag : L"NULL"
+        (*ReturnTag != NULL) ? *ReturnTag : L"NULL"
     );
     LOG_DECREMENT();
     LOG_SEP(L"X");

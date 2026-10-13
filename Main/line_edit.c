@@ -1,7 +1,9 @@
-// Line-editing functions borrowed from gummiboot (cursor_left(),
-// cursor_right(), & line_edit()).
-
 /*
+ * Main/line-edit.c
+ *
+ * Line-editing functions borrowed from gummiboot (cursor_left(),
+ * cursor_right(), & line_edit()).
+ *
  * Simple UEFI boot loader which executes configured EFI images, where the
  * default entry is selected by a configured pattern (glob) or an on-screen
  * menu.

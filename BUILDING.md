@@ -106,14 +106,9 @@ Please refer to that project's repository (https://github.com/xaionaro/edk2-buil
 
 <br><br>
 
-<!--
-DA-TAG: High chance of need to recycle to flag as limited to Mac OS 26.x Tahoe/Older!
-        Maybe Mac OS 27.x WhatEver/Older. Best case scenario (unless RUDK is patched)
-
 > [!CAUTION]
 >
-> The process outlined below *HAS NOT* been verified on Mac OS 26.x Tahoe/Newer.
--->
+> The process outlined below is limited to Mac OS 26.x Tahoe/Older.
 
 ## Local Build (Mac OS)
 

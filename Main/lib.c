@@ -1212,9 +1212,11 @@ REFIT_VOLUME * CopyVolume (
       // Create New Volume based on VolumeToCopy (in 'UnInit' state)
     Volume = AllocateCopyPool (sizeof (REFIT_VOLUME), VolumeToCopy);
     if (Volume != NULL) {
+        Volume->OSName        = StrDuplicate (VolumeToCopy->OSName);
         Volume->FsName        = StrDuplicate (VolumeToCopy->FsName);
         Volume->VolName       = StrDuplicate (VolumeToCopy->VolName);
         Volume->PartName      = StrDuplicate (VolumeToCopy->PartName);
+        Volume->OSIconName    = StrDuplicate (VolumeToCopy->OSIconName);
         Volume->VolIconImage  = egCopyImage (VolumeToCopy->VolIconImage);
         Volume->VolBadgeImage = egCopyImage (VolumeToCopy->VolBadgeImage);
 
@@ -1264,9 +1266,11 @@ VOID FreeVolume (
     UninitVolume (Volume);
 
     // Free pool elements
+    MY_FREE_POOL((*Volume)->OSName);
     MY_FREE_POOL((*Volume)->FsName);
     MY_FREE_POOL((*Volume)->VolName);
     MY_FREE_POOL((*Volume)->PartName);
+    MY_FREE_POOL((*Volume)->OSIconName);
     MY_FREE_POOL((*Volume)->DevicePath);
     MY_FREE_POOL((*Volume)->MbrPartitionTable);
     MY_FREE_POOL((*Volume)->WholeDiskDevicePath);
@@ -1353,7 +1357,7 @@ CHAR16 * FSTypeName (
 
     i = 0;
     FoundVentoy = FALSE;
-    while (!FoundVentoy) {
+    do {
         VentoyName = FindCommaDelimited (
             VENTOY_NAMES, i++
         );
@@ -1361,24 +1365,26 @@ CHAR16 * FSTypeName (
 
         if (MyStrBegins (VentoyName, Volume->VolName)) {
             GlobalConfig.HandleVentoy = FoundVentoy = TRUE;
+            if (MyStriCmp (retval, LABEL_UNKNOWN)) {
+                retval = L"ExFAT (Assumed)";
+            }
         }
 
         MY_FREE_POOL(VentoyName);
+    } while (!FoundVentoy);
 
-        if (FoundVentoy && MyStriCmp (retval, LABEL_UNKNOWN)) {
-            return L"ExFAT (Assumed)";
-        }
-    } // while
+    if (Volume->DiskKind == DISK_KIND_NET &&
+        MyStriCmp (retval, LABEL_UNKNOWN)
+    ) {
+        retval = L"Network";
+    }
 
     if (!MyStriCmp (retval, LABEL_UNKNOWN)) {
         return retval;
     }
 
-    if (GuidsAreEqual (&(Volume->PartTypeGuid), &GuidBasicData)) {
-        retval = (
-            FoundVentoy
-        ) ? L"ExFAT (Assumed)" : L"NTFS (Assumed)";
-    }
+    if (0);
+    else if (GuidsAreEqual (&(Volume->PartTypeGuid), &GuidBasicData )) retval = L"NTFS (Assumed)"  ;
     else if (GuidsAreEqual (&(Volume->PartTypeGuid), &GuidReservedMS)) retval = L"NTFS (Assumed)"  ;
     else if (GuidsAreEqual (&(Volume->PartTypeGuid), &GuidWindowsRE )) retval = L"NTFS (Assumed)"  ;
     else if (GuidsAreEqual (&(Volume->PartTypeGuid), &GuidESP       )) retval = L"FAT-32 (Assumed)";
@@ -1725,15 +1731,15 @@ VOID ScanVolumeBootcode (
         FindMem    (Buffer, SECTOR_SIZE, "ISOLINUX", 8) >= 0
     ) {
         Volume->HasBootCode  = TRUE;
-        Volume->OSIconName   = L"linux";
-        Volume->OSName       = L"Instance: Linux (Legacy)";
+        Volume->OSIconName   = StrDuplicate (L"linux");
+        Volume->OSName       = StrDuplicate (L"Instance: Linux (Legacy)");
     }
     else if (
         FindMem (Buffer, BASE_SIZE, "Geom\0Hard Disk\0Read\0 Error", 26) >= 0
     ) {
         Volume->HasBootCode  = TRUE;
-        Volume->OSIconName   = L"grub,linux";
-        Volume->OSName       = L"Instance: Linux (Legacy)";
+        Volume->OSIconName   = StrDuplicate (L"grub,linux");
+        Volume->OSName       = StrDuplicate (L"Instance: Linux (Legacy)");
     }
     else if (
         FindMem (Buffer, SECTOR_SIZE, "Starting the BTX loader", 23) >= 0 ||
@@ -1744,8 +1750,8 @@ VOID ScanVolumeBootcode (
         )
     ) {
         Volume->HasBootCode  = TRUE;
-        Volume->OSIconName   = L"freebsd";
-        Volume->OSName       = L"Instance: FreeBSD (Legacy)";
+        Volume->OSIconName   = StrDuplicate (L"freebsd,bsd");
+        Volume->OSName       = StrDuplicate (L"Instance: FreeBSD (Legacy)");
     }
     else if (
         (*((UINT16 *)(Buffer + 510)) == 0xaa55)                                   &&
@@ -1754,70 +1760,70 @@ VOID ScanVolumeBootcode (
     ) {
         // Add "Invalid Partition Table" and/or "Missing Boot Loader" for More Differentiation
         Volume->HasBootCode  = TRUE;
-        Volume->OSIconName   = L"freebsd";
-        Volume->OSName       = L"Instance: FreeBSD (Legacy)";
+        Volume->OSIconName   = StrDuplicate (L"freebsd,bsd");
+        Volume->OSName       = StrDuplicate (L"Instance: FreeBSD (Legacy)");
     }
     else if (
         FindMem (Buffer, BASE_SIZE,   "!Loading",            8) >= 0 ||
         FindMem (Buffer, SECTOR_SIZE, "/cdboot\0/CDBOOT\0", 16) >= 0
     ) {
         Volume->HasBootCode  = TRUE;
-        Volume->OSIconName   = L"openbsd";
-        Volume->OSName       = L"Instance: OpenBSD (Legacy)";
+        Volume->OSIconName   = StrDuplicate (L"openbsd,bsd");
+        Volume->OSName       = StrDuplicate (L"Instance: OpenBSD (Legacy)");
     }
     else if (
         FindMem (Buffer, BASE_SIZE, "Not a bootxx image", 18) >= 0 ||
         *((UINT32 *)(Buffer + 1028)) == 0x7886b6d1
     ) {
         Volume->HasBootCode  = TRUE;
-        Volume->OSIconName   = L"netbsd";
-        Volume->OSName       = L"Instance: NetBSD (Legacy)";
+        Volume->OSIconName   = StrDuplicate (L"netbsd,bsd");
+        Volume->OSName       = StrDuplicate (L"Instance: NetBSD (Legacy)");
     }
     else if (FindMem (Buffer, SECTOR_SIZE, "NTLDR", 5) >= 0) {
         // Windows NT/200x/XP
         Volume->HasBootCode  = TRUE;
-        Volume->OSIconName   = L"windows,win,win8";
-        Volume->OSName       = L"Instance: Windows (Legacy - NT/XP)";
+        Volume->OSIconName   = StrDuplicate (L"windows,win,win8");
+        Volume->OSName       = StrDuplicate (L"Instance: Windows (Legacy - NT/XP)");
     }
     else if (FindMem (Buffer, SECTOR_SIZE, "BOOTMGR", 7) >= 0) {
         // Windows Vista/7/8/10/11
         Volume->HasBootCode  = TRUE;
-        Volume->OSIconName   = L"windows,win,win8";
-        Volume->OSName       = L"Instance: Windows (Legacy)";
+        Volume->OSIconName   = StrDuplicate (L"windows,win,win8");
+        Volume->OSName       = StrDuplicate (L"Instance: Windows (Legacy)");
     }
     else if (
         FindMem (Buffer, BASE_SIZE, "CPUBOOT SYS", 11) >= 0 ||
         FindMem (Buffer, BASE_SIZE, "KERNEL  SYS", 11) >= 0
     ) {
         Volume->HasBootCode  = TRUE;
-        Volume->OSIconName   = L"freedos";
-        Volume->OSName       = L"Instance: FreeDOS (Legacy)";
+        Volume->OSIconName   = StrDuplicate (L"freedos");
+        Volume->OSName       = StrDuplicate (L"Instance: FreeDOS (Legacy)");
     }
     else if (
         FindMem (Buffer, BASE_SIZE, "OS2LDR",  6) >= 0 ||
         FindMem (Buffer, BASE_SIZE, "OS2BOOT", 7) >= 0
     ) {
         Volume->HasBootCode  = TRUE;
-        Volume->OSIconName   = L"ecomstation";
-        Volume->OSName       = L"Instance: eComStation (Legacy)";
+        Volume->OSIconName   = StrDuplicate (L"ecomstation");
+        Volume->OSName       = StrDuplicate (L"Instance: eComStation (Legacy)");
     }
     else if (FindMem (Buffer, BASE_SIZE, "Be Boot Loader", 14) >= 0) {
         Volume->HasBootCode  = TRUE;
-        Volume->OSIconName   = L"beos";
-        Volume->OSName       = L"Instance: BeOS (Legacy)";
+        Volume->OSIconName   = StrDuplicate (L"beos,haiku");
+        Volume->OSName       = StrDuplicate (L"Instance: BeOS (Legacy)");
     }
     else if (FindMem (Buffer, BASE_SIZE, "yT Boot Loader", 14) >= 0) {
         Volume->HasBootCode  = TRUE;
-        Volume->OSIconName   = L"zeta,beos";
-        Volume->OSName       = L"Instance: ZETA (Legacy)";
+        Volume->OSIconName   = StrDuplicate (L"zeta,beos,haiku");
+        Volume->OSName       = StrDuplicate (L"Instance: ZETA (Legacy)");
     }
     else {
         if (FindMem (Buffer, BASE_SIZE, "\x04" "beos\x06" "system\x05" "zbeos", 18) >= 0 ||
             FindMem (Buffer, BASE_SIZE, "\x06" "system\x0c" "haiku_loader",     20) >= 0
         ) {
             Volume->HasBootCode  = TRUE;
-            Volume->OSIconName   = L"haiku,beos";
-            Volume->OSName       = L"Instance: Haiku (Legacy)";
+            Volume->OSIconName   = StrDuplicate (L"haiku,beos");
+            Volume->OSName       = StrDuplicate (L"Instance: Haiku (Legacy)");
         } // if/else CompareMem
     } // if/else CompareMem
 
@@ -2041,9 +2047,9 @@ CHAR16 * SizeInIEEEUnits (
     UINT64        SizeInIeee;
 
 
-    NumPrefixes = StrLen (Prefixes);
-    SizeInIeee = SizeInBytes;
     Index = 0;
+    SizeInIeee = SizeInBytes;
+    NumPrefixes = StrLen (Prefixes);
     while ((SizeInIeee > 1024) && (Index < (NumPrefixes - 1))) {
         Index++;
         SizeInIeee /= 1024;
@@ -2063,7 +2069,7 @@ CHAR16 * SizeInIEEEUnits (
     return TheValue;
 } // static CHAR16 * SizeInIEEEUnits()
 
-// Determine the unique GUID, type code GUID, and name of the volume and store them.
+// Determine and store the unique GUID, type code GUID, and name of volume.
 static
 VOID SetPartGuidAndName (
     IN OUT REFIT_VOLUME             *Volume,
@@ -2113,7 +2119,9 @@ VOID SetPartGuidAndName (
         GlobalConfig.DiscoveredRoot = Volume;
     }
 
-    Volume->IsMarkedReadOnly = ((PartInfo->attributes & GPT_READ_ONLY) > 0);
+    Volume->IsMarkedReadOnly = (
+        (PartInfo->attributes & GPT_READ_ONLY) > 0
+    );
 
     MY_FREE_POOL(PartInfo);
 } // static VOID SetPartGuidAndName()
@@ -2142,46 +2150,21 @@ CHAR16 * GetVolumeNameEx (
     //         Such as: use or add disk/partition number (e.g., "(hd0,2)")
     if (Volume->FsName          != NULL  &&
         Volume->FsName[0]       != L'\0' &&
-        StrLen (Volume->FsName) != 0
+        StrLen (Volume->FsName) !=    0
     ) {
-        return StrDuplicate (
+        FoundName = StrDuplicate (
             (
                 Volume->FSType == FS_TYPE_EXFAT &&
                 MyStriCmp (Volume->FsName, L"FAT")
             ) ? L"ExFAT" : Volume->FsName
         );
     }
-
-
-    // Try to use the partition name if no filesystem name
-    if (Volume->PartName          != NULL  &&
-        Volume->PartName[0]       != L'\0' &&
-        StrLen (Volume->PartName) >     0  &&
-        !IsListItem (Volume->PartName, IGNORE_PARTITION_NAMES)
-    ) {
-        return StrDuplicate (Volume->PartName);
-    }
-
-    if (Volume->DiskKind == DISK_KIND_OPTICAL) {
+    else if (Volume->DiskKind == DISK_KIND_OPTICAL) {
         FoundName = StrDuplicate (
             (
                 Volume->FSType == FS_TYPE_ISO9660
             ) ? L"Optical ISO-9660 Image" : L"Optical Disc Drive"
         );
-    }
-    else if (GuidsAreEqual (&(Volume->PartTypeGuid), &GuidLinux)) {
-        TmpName = NULL;
-        HandleParseCall (
-            &TmpName, Volume,
-            TRUE, TRUE
-        );
-
-        if (TmpName != NULL) {
-            FoundName = TmpName;
-        }
-        else {
-            FoundName = StrDuplicate (L"Linux Volume");
-        }
     }
     else if (GuidsAreEqual (&(Volume->PartTypeGuid), &GuidAPFS      )) FoundName = StrDuplicate (L"APFS/FileVault Container"      );
     else if (GuidsAreEqual (&(Volume->PartTypeGuid), &GuidESP       )) FoundName = StrDuplicate (L"EFI System Partition"          );
@@ -2192,40 +2175,76 @@ CHAR16 * GetVolumeNameEx (
     else if (GuidsAreEqual (&(Volume->PartTypeGuid), &GuidContainHFS)) FoundName = StrDuplicate (L"Fusion/FileVault Container"    );
     else if (GuidsAreEqual (&(Volume->PartTypeGuid), &GuidApplTvRec )) FoundName = StrDuplicate (L"AppleTV Recovery Partition"    );
     else {
+        FoundName = (
+            Volume->PartName          != NULL  &&
+            Volume->PartName[0]       != L'\0' &&
+            StrLen (Volume->PartName) !=    0  &&
+            !IsListItem (Volume->PartName, IGNORE_PARTITION_NAMES)
+        ) ? StrDuplicate (Volume->PartName) : NULL;
+    }
+
+    if (FoundName != NULL) {
+        return FoundName;
+    }
+
+    if (GuidsAreEqual (&(Volume->PartTypeGuid), &GuidLinux)) {
+        TmpName = NULL;
+        HandleParseCall (
+            &TmpName, Volume,
+            TRUE, TRUE
+        );
+
+        FoundName = (
+            TmpName != NULL
+        ) ? TmpName :  StrDuplicate (
+            L"Linux Volume"
+        );
+    }
+    else {
         Status = REFIT_CALL_5_WRAPPER(
             Volume->BlockIO->ReadBlocks, Volume->BlockIO,
             Volume->BlockIO->Media->MediaId, Volume->BlockIOOffset,
             SAMPLE_SIZE, Buffer
         );
 
-        if (Status == EFI_NO_MEDIA) {
-            FoundName = StrDuplicate (L"Network Volume (Assumed)");
-        }
+        if (0);
+        else if (Status == EFI_NO_MEDIA                             ) FoundName = StrDuplicate (L"Network Volume (Assumed)"   );
+        else if (GuidsAreEqual (&(Volume->PartTypeGuid), &gRootGuid)) FoundName = StrDuplicate (L"Linux Root Volume"          );
+        else if (GuidsAreEqual (&(Volume->PartTypeGuid), &GuidSwap )) FoundName = StrDuplicate (L"Linux Swap Volume"          );
+        else if (GuidsAreEqual (&(Volume->PartTypeGuid), &GuidHome )) FoundName = StrDuplicate (L"Linux Home Volume"          );
+        else if (GuidsAreEqual (&(Volume->PartTypeGuid), &GuidRaid )) FoundName = StrDuplicate (L"Linux RAID Volume"          );
+        else if (GuidsAreEqual (&(Volume->PartTypeGuid), &GuidBoot )) FoundName = StrDuplicate (L"Linux XBOOTLDR Partition"   );
+        else if (GuidsAreEqual (&(Volume->PartTypeGuid), &GuidLuks )) FoundName = StrDuplicate (L"Encrypted Linux Partition"  );
+        else if (GuidsAreEqual (&(Volume->PartTypeGuid), &GuidHFS  )) FoundName = StrDuplicate (L"Unidentified HFS+ Partition");
         else {
-            // Do *NOT* Free ... 'FSTypeName' returns a constant
+            // Do *NOT* Free ... 'FSTypeName' returns literal
             TypeName = FSTypeName (Volume);
 
             if (MyStriCmp (TypeName, L"APFS")) {
-                FoundName = StrDuplicate (L"APFS Volume (Assumed)");
+                FoundName = StrDuplicate (
+                    L"APFS Volume (Assumed)"
+                );
             }
-            else if (GuidsAreEqual (&(Volume->PartTypeGuid), &gRootGuid)) FoundName = StrDuplicate (L"Linux Root Volume"          );
-            else if (GuidsAreEqual (&(Volume->PartTypeGuid), &GuidSwap )) FoundName = StrDuplicate (L"Linux Swap Volume"          );
-            else if (GuidsAreEqual (&(Volume->PartTypeGuid), &GuidHome )) FoundName = StrDuplicate (L"Linux Home Volume"          );
-            else if (GuidsAreEqual (&(Volume->PartTypeGuid), &GuidRaid )) FoundName = StrDuplicate (L"Linux RAID Volume"          );
-            else if (GuidsAreEqual (&(Volume->PartTypeGuid), &GuidLuks )) FoundName = StrDuplicate (L"Linux Encrypted Volume"     );
-            else if (GuidsAreEqual (&(Volume->PartTypeGuid), &GuidBoot )) FoundName = StrDuplicate (L"Linux XBOOTLDR Partition"   );
-            else if (GuidsAreEqual (&(Volume->PartTypeGuid), &GuidHFS  )) FoundName = StrDuplicate (L"Unidentified HFS+ Partition");
             else {
-                // Try to use fs type and size as name
-                FileSystemInfoPtr = (Volume->RootDir != NULL)
-                    ? LibFileSystemInfo (Volume->RootDir) : NULL;
+                FileSystemInfoPtr = (
+                    Volume->RootDir != NULL
+                ) ? LibFileSystemInfo (
+                    Volume->RootDir
+                ) : NULL;
 
                 if (FileSystemInfoPtr == NULL) {
-                    FoundName = PoolPrint (L"%s Volume", TypeName);
+                    FoundName = PoolPrint (
+                        L"%s Volume", TypeName
+                    );
                 }
                 else {
-                    SISize    = SizeInIEEEUnits (FileSystemInfoPtr->VolumeSize);
-                    FoundName = PoolPrint (L"%s %s Volume", SISize, TypeName);
+                    SISize = SizeInIEEEUnits (
+                        FileSystemInfoPtr->VolumeSize
+                    );
+                    FoundName = PoolPrint (
+                        L"%s %s Volume",
+                        SISize, TypeName
+                    );
                     MY_FREE_POOL(FileSystemInfoPtr);
                     MY_FREE_POOL(SISize);
                 }
@@ -2283,19 +2302,19 @@ BOOLEAN VolumeScanAllowed (
         return FALSE;
     }
 
-    if (Volume->FSType == FS_TYPE_APFS) {
-        if (GlobalConfig.SyncAPFS                    &&
-            Volume->VolRole == APFS_VOLUME_ROLE_PREBOOT
-        ) {
-            return TRUE;
-        }
+    if (GlobalConfig.SyncAPFS                    &&
+        Volume->FSType  == FS_TYPE_APFS          &&
+        Volume->VolRole == APFS_VOLUME_ROLE_PREBOOT
+    ) {
+        return TRUE;
+    }
 
-        if (Volume->VolRole != APFS_VOLUME_ROLE_SYSTEM  &&
-            Volume->VolRole != APFS_VOLUME_ROLE_PREBOOT &&
-            Volume->VolRole != APFS_VOLUME_ROLE_UNDEFINED
-        ) {
-            return FALSE;
-        }
+    if (Volume->FSType  == FS_TYPE_APFS             &&
+        Volume->VolRole != APFS_VOLUME_ROLE_SYSTEM  &&
+        Volume->VolRole != APFS_VOLUME_ROLE_PREBOOT &&
+        Volume->VolRole != APFS_VOLUME_ROLE_UNDEFINED
+    ) {
+        return FALSE;
     }
 
     if (Volume->FSType == FS_TYPE_HFSPLUS                    &&
@@ -2305,16 +2324,16 @@ BOOLEAN VolumeScanAllowed (
     }
 
     if (Volume->FSType == FS_TYPE_NTFS) {
-        if (MyStriCmp (Volume->VolName, L"System Reserved"             )  ||
-            MyStriCmp (Volume->VolName, L"System Device Bay"           )  ||
+        if (MyStriCmp (Volume->VolName, L"System Reserved"             ) ||
+            MyStriCmp (Volume->VolName, L"System Device Bay"           ) ||
             MyStriCmp (Volume->VolName, L"Microsoft Reserved Partition")
         ) {
             return FALSE;
         }
     }
 
-    if (IsListItem (Volume->VolName,  GlobalConfig.DontScanVolumes) ||
-        IsListItem (Volume->FsName,   GlobalConfig.DontScanVolumes) ||
+    if (IsListItem (Volume->FsName,   GlobalConfig.DontScanVolumes) ||
+        IsListItem (Volume->VolName,  GlobalConfig.DontScanVolumes) ||
         IsListItem (Volume->PartName, GlobalConfig.DontScanVolumes)
     ) {
         return FALSE;
@@ -2340,8 +2359,8 @@ BOOLEAN VolumeScanAllowed (
                 );
                 if (VentoyName == NULL) break;
 
-                if (MyStrBegins (VentoyName, Volume->VolName) ||
-                    MyStrBegins (VentoyName, Volume->FsName)  ||
+                if (MyStrBegins (VentoyName, Volume->FsName)  ||
+                    MyStrBegins (VentoyName, Volume->VolName) ||
                     MyStrBegins (VentoyName, Volume->PartName)
                 ) {
                     FoundVentoy = TRUE;
@@ -2668,8 +2687,8 @@ VOID ScanVolume (
     VolGuid = GuidAsString (&(Volume->PartGuid));
     if (MyStrBegins (SYM_TAG_OFF,  GlobalConfig.FollowSymlinks)) {
         // Handle 'Exclusion List' Config Setting
-        if (!IsListItem (Volume->VolName,  GlobalConfig.FollowSymlinks) &&
-            !IsListItem (Volume->FsName,   GlobalConfig.FollowSymlinks) &&
+        if (!IsListItem (Volume->FsName,   GlobalConfig.FollowSymlinks) &&
+            !IsListItem (Volume->VolName,  GlobalConfig.FollowSymlinks) &&
             !IsListItem (Volume->PartName, GlobalConfig.FollowSymlinks) &&
             !IsListItem (VolGuid,          GlobalConfig.FollowSymlinks)
         ) {
@@ -2678,8 +2697,8 @@ VOID ScanVolume (
     }
     else {
         // Handle 'Inclusion List' Config Setting
-        if (IsListItem (Volume->VolName,  GlobalConfig.FollowSymlinks) ||
-            IsListItem (Volume->FsName,   GlobalConfig.FollowSymlinks) ||
+        if (IsListItem (Volume->FsName,   GlobalConfig.FollowSymlinks) ||
+            IsListItem (Volume->VolName,  GlobalConfig.FollowSymlinks) ||
             IsListItem (Volume->PartName, GlobalConfig.FollowSymlinks) ||
             IsListItem (VolGuid,          GlobalConfig.FollowSymlinks)
         ) {
@@ -3396,7 +3415,7 @@ VOID ScanVolumes (VOID) {
         else if (IsStriStr (Volume->VolName, L"APFS/FileVault"           )) RoleStr = L"?* Type Entity-Container";
         else if (MyStriCmp (Volume->VolName, L"Whole Disk Volume"        )) RoleStr = L" * Type Entity-WholeDisk";
         else if (GuidsAreEqual (&(Volume->PartTypeGuid), &GuidESP        )) RoleStr = L" * Part System EFI (ESP)";
-        else if (GuidsAreEqual (&(Volume->PartTypeGuid), &GuidLinux      )) RoleStr = L" * Type Volume-LinuxBase";
+        else if (GuidsAreEqual (&(Volume->PartTypeGuid), &GuidLinux      )) RoleStr = L" * Type Volume-LinuxCore";
         else if (GuidsAreEqual (&(Volume->PartTypeGuid), &gRootGuid      )) RoleStr = L" * Type Volume-LinuxRoot";
         else if (GuidsAreEqual (&(Volume->PartTypeGuid), &GuidBoot       )) RoleStr = L" * Part Extended BootLdr";
         else if (GuidsAreEqual (&(Volume->PartTypeGuid), &GuidHome       )) RoleStr = L" * Type Volume-LinuxHome";
@@ -4716,8 +4735,8 @@ BOOLEAN VolumeMatchesDescription (
 
     if (!IsGuid (FilteredDescription)) {
         return (
-            MyStriCmp (FilteredDescription, Volume->VolName)  ||
-            MyStriCmp (FilteredDescription, Volume->FsName)   ||
+            MyStriCmp (FilteredDescription, Volume->FsName)  ||
+            MyStriCmp (FilteredDescription, Volume->VolName) ||
             MyStriCmp (FilteredDescription, Volume->PartName)
         );
     }

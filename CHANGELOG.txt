@@ -1,9 +1,16 @@
-0.14.2.AF (PRE-RELEASE):
+0.14.2.AF (13 OCT 2026):
 -----------------------
+- Adds `BtrFS Snapshot` Support
+  * Displayed as `SubMemu` options
+  * A maximum of 99 instances can be displayed
+  * Configurable via a new `max_snapshots` setting
+  * Only for setups with kernel and loader on one volume
 - Fixes `BadRamTag` Feature
   * The `badram_tag_wide` setting was not `'ON' by Default` as intended
   * This bug was introduced in v0.14.2.AE (Commit 973479b)
     - Default was not changed when repurposing the setting
+- Fixes `ShowTools` Feature
+  * The `showtools` setting did not act as documented when set without parameters
 - Improves `Boot Loader Specification (BLS)` Handling
   * `Type 1 BLS` setups are not yet supported
   * `Type 2 BLS` setups were already supported
@@ -14,7 +21,7 @@
   * Now dynamically scans and filters for shell files
   * Provides flexibility in naming subject to `EFI_Shell-` prefix
   * Provides flexibility in placement
-- Improves Misc `BSD OStype` Handling (Thx @seuros)
+- Improves Misc `BSD OStype` Handling
   * Better detects and loads available icons
   * Some previously missing icons supplied or updated
 - Improves `Volume Type` Identification
@@ -23,7 +30,7 @@
 - Improves `Default Title Banner` Handling
   * This banner cannot be rationally scaled
   * Therefore now always forced to `NoScale`
-- Improves `Embeddded Image` Handling
+- Improves `Embedded Image` Handling
   * Enhanced embedded CleanNvram image
     - Transparent background fix
     - Proper scaling applied

@@ -24,10 +24,6 @@
  *
  * Copyright (C) 2012-2013 Kay Sievers <kay@vrfy.org>
  * Copyright (C) 2012 Harald Hoyer <harald@redhat.com>
- *
- * "Any intelligent fool can make things bigger, more complex, and more violent.
-"
- *   -- Albert Einstein
  */
 
 #ifndef __LINE_EDIT_H_

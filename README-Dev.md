@@ -20,16 +20,16 @@ A Boot Manager for Mac and PC
 
 RefindPlus is a fork of _`rEFInd`_ that provides extended functionality via enhancements and fixes that include several Apple Mac and UEFI-PC related items that may be of interest to anyone requiring a boot manager for Mac and PC.
 
-RefindPlus is particularly useful for those with additional configuration needs or that require advanced or otherwise non-standard (hence typically unavailable) options for running operating systems and uEFI utilities on Mac and PC.
+> `'RefindPlus'` is a case-sensitive single word.
+>
+> > [Standard]:- **RefindPlus** \
+> > [Lowercase]:- **refindplus** \
+> > [Uppercase]:- **REFINDPLUS**
+>
+> It _MAY_ be abbreviated as '**RP**' or '**rp**'. \
+> It _SHALL NOT_ be split or otherwise mutated.
 
-> `RefindPlus` is a case-sensitive single word.
->
-> > Standard: **RefindPlus** \
-> > Lowercase: **refindplus** \
-> > Uppercase: **REFINDPLUS**
->
-> It _MUST NOT_ be split or mutated. \
-> It _MAY_ be abbreviated as '**RP**' or '**rp**'.
+RefindPlus is particularly useful for those with additional configuration needs or that require advanced or otherwise non-standard (hence typically unavailable) options for running operating systems and uEFI utilities on Mac and PC.
 
 Some RefindPlus Features:
 - Maintains feature and configuration parity with `Upstream v0.14.2` base.
@@ -37,12 +37,13 @@ Some RefindPlus Features:
 - Provides protection against damage to vulnerable Mac nvRAM by UEFI Windows.
 - Emulates UEFI 2.x on EFI 1.x units to permit running UEFI 2.x utilities on such units.
 - Provides mitigation against boot failures and related issues on T2/TPM chipped units.
-- Provides Pre-Boot Configuration Screen on Apple Macs running GPUs without native EFI.
+- Provides PreBoot Configuration Screen on Apple Macs running GPUs without native EFI.
 - Extensive memory management improvements with associated speed and stability gains.
+- Accommodates BtrFS Snapshots, which are shown as SubScreen options when present.
 - Provides improved text display support for languages that require unicode text.
 - Identifies and automatically handles `Ventoy` instances if present.
   - Rationalises binaries displayed.
-  - Displays an `os_ventoy` icon if available.
+  - Displays available `os_ventoy` icon.
 - Includes troubleshooting (`DBG`/`NPT`) binaries for debugging.
   - The standard release (`REL`) binary is for day to day use.
 - Fixes inability to print to screen on some Macs.
@@ -98,7 +99,7 @@ When run without activating RefindPlus-specific configuration options, as will b
 
 ## Additional Functionality
 
-RefindPlus-specific funtionality can be configured using the tokens below. \
+RefindPlus-specific functionality can be configured using the tokens below. \
 Additional information is provided in the sample RefindPlus configuration file. \
 These tokens are included in `Section 1` of the sample RefindPlus configuration file.
 
@@ -122,10 +123,10 @@ disable_exitlogo_clear |Disables clearing displayed exit logo images on exit scr
 disable_exitlogo_image |Disables display of exit logo images on exit screens
 disable_exitlogo_scale |Disables scaling displayed exit logo images on exit screens
 disable_pass_gop_thru  |Disables feature that provides GOP instance on UGA for some loading screens
-disable_legacy_sync    |Disables detailed indentification of Mac legacy BIOS boot capability
-disable_nvram_paniclog |Disables logging Mac OS kernel panics to nvRAM
+disable_legacy_sync    |Disables detailed identification of Mac legacy BIOS boot capability
+disable_nvram_paniclog |Disables the writing of Mac OS kernel panic logs to nvRAM
 disable_nvram_protect  |Disables blocking of potentially harmful write attempts to Legacy Mac nvRAM
-disable_reload_gop     |Disables UEFI 2.x GOP OptionROM activation fix for EFI 1.x units
+disable_reload_gop     |Disables the GOP OptionROM activation fix for EFI 1.x units
 disable_rescan_dxe     |Disables scanning for newly revealed DXE drivers when connecting handles
 disable_set_applefb    |Disables conditional provision of missing Apple framebuffers on Macs
 disable_set_consolegop |Disables feature that fixes some issues with GOP graphics on legacy units
@@ -136,6 +137,7 @@ hidden_icons_ignore    |Disables scanning for `.VolumeIcon` image icons if not r
 hidden_icons_prefer    |Prioritises `.VolumeIcon` and `.VolumeBadge` image icons when available
 icon_row_move          |Repositions the main screen icon rows (vertically)
 icon_row_tune          |Fine tunes the resulting `icon_row_move` outcome
+max_snapshots          |Allows configuring `BtrFS Snapshots` made available for booting
 mitigate_primed_buffer |Allows enhanced intervention to handle apparent primed keystroke buffers
 nvram_protect_ex       |Extends `NvramProtect`, if set, to Mac OS and `unknown` UEFI boots
 nvram_variable_limit   |Limits nvRAM write attempts to the specified variable size
@@ -157,9 +159,9 @@ unicode_collation      |Provides fine tuned support for languages that require u
 
 ## Modified Functionality
 
-In addition to the new functionality listed above, the following upstream tokens have been modified:
-- **"timeout":** The RefindPlus default is no timeout unless explicitly set.
-- **"use_nvram":** Variable storage is on the filesystem, not the nvRAM chip, unless explicitly set.
+In addition to the new functionality listed above, the following upstream config tokens have been modified:
+- **"timeout":** The RefindPlus default is no timeout unless explicitly set via this config token.
+- **"use_nvram":** Variable storage is on the filesystem, not the nvRAM chip, unless explicitly set to do so via this config token.
 - **"use_graphics_for":** Additional options added:
   - `tools` option to _enable_ graphics mode loading for such.
   - `none` option to _disable_ graphics mode loading for everything.
@@ -202,18 +204,20 @@ Significant visible implementation differences vis-a-vis the upstream base are:
 - **UEFI Secure Boot:** RefindPlus binaries as from v0.14.2.AD include the `Secure Boot Advanced Targeting (SBAT)` section required by Shim v15.3/newer for secure boot support but require users to self-sign the binaries and to self-enrol the associated certificate.
   - > The process [outlined upstream](https://www.rodsbooks.com/refind/secureboot.html#installation) for self-signing can be followed to enable support.
   - > An adaptation of the process for RefindPlus is [provided here](https://github.com/RefindPlusRepo/RefindPlus/discussions/190#discussioncomment-10130431). Modify for newer releases as required.
-  - > Refer to [this summation](https://forum.manjaro.org/t/howto-enable-secure-boot-with-refind/121403/6) for futher insight.
+  - > Refer to [this summation](https://forum.manjaro.org/t/howto-enable-secure-boot-with-refind/121403/6) for further insight.
 - **GZipped Loaders:** RefindPlus only provides stub support for handling GZipped loaders as this is largely only relevant for units with ARM chips.
   - > This stub support is only used for debug logging in RefindPlus and can be activated using the same `support_gzipped_loaders` setting as upstream.
+- **BtrFS Snapshots:** RefindPlus adds up to 10 `Snapshot instances` as submenu items, reachable by pressing `"F2"` or `"Insert"`, for Linux BtrFS entries.
+  - > Set the RefindPlus-specific `max_snapshots` setting to `0` to disable this feature or to a number from `1` to`99` to have that number of instances.
 - **Screenshots:** These are saved in the PNG format with a significantly smaller file size.
   - > Additionally, the file naming is different and files are always saved to the same ESP as RefindPlus.
-- **UI Flags:** RefindPlus requires that any desired previously set `hideui` setting options are explicitly defined in supplementary/theme configuration files; as whenever the token is found in such files, the token setting is reset by RefindPlus to the specified option(s). The upstream implementation effectively adds new settings to any previously existing ones for this token instead.
-  - > RefindPlus maintains consistency with how other tokens are handled.
+- **UI Flags:** RefindPlus requires that any desired previously set `hideui` setting options are explicitly defined in supplementary/theme configuration files; as whenever the token is found in such files, the token setting is reset by RefindPlus to the specified option(s). The upstream implementation effectively adds new settings to any previously existing ones for this config token instead.
+  - > RefindPlus maintains consistency with how other config tokens are handled.
 - **UI Scaling:** WQHD monitors are correctly determined not to be HiDPI monitors and UI elements are not scaled up on such monitors when the RefindPlus-specific `scale_ui` setting is set to automatically detect the screen resolution. RefindPlus also scales UI elements down when low resolution screens (less than 1025px on the longest edge) are detected.
   - > Additionally, UI elements on extremely high resolution screens (greater than 5999px on the longest edge) receive a `4X scaling` as opposed to the `2X scaling` applied for standard HiDPI screens.
-- **Loader Icons:** RefindPlus prefers `os_windows`/`boot_windows` icon files, if present, over `os_win`/`boot_win` files (and `win8` variants). Separately, RefindPlus prefers generic OS icons over custom icons by default (improves load speed). The upstream icon search implementation involves loading generic OS icons only if a search for custom icons has returned empty.
+- **Loader Icons:** RefindPlus prefers `os_windows`/`boot_windows` icon files, if present, over `os_win`/`boot_win` files (and `win8` variants). Separately, RefindPlus prefers generic OS icons over custom icons by default (improves load speed). The upstream icon search implementation only loads a generic OS icons after a custom icon search has returned empty.
   - > Activate the RefindPlus-specific `decline_help_icon` setting to keep the upstream implementation.
-- **GOP OptionROM Provision:** RefindPlus attempts to ensure that GOP is available, to permit using modern GPUs on on EFI 1.x units, by amending the `UEFI System Table` and reloading the GOP OptionROM from the GPU. This is via an inbuilt `ReloadGOP` feature.
+- **GOP OptionROM Provision:** RefindPlus attempts to ensure that GOP is available, to permit modern GPUs on EFI 1.x units, by amending the `UEFI System Table` and reloading the GOP OptionROM. This is via an inbuilt `ReloadGOP` feature.
   - > Activate the RefindPlus-specific `disable_reload_gop` setting to switch this feature off.
 - **Apple Framebuffer Provision:** RefindPlus defaults to always providing Apple framebuffers on Macs, when not available under certain circumstances. This is via an inbuilt `SetAppleFB` feature.
   - > Activate the RefindPlus-specific `disable_set_applefb` setting to switch this feature off.
@@ -225,9 +229,9 @@ Significant visible implementation differences vis-a-vis the upstream base are:
   - > Activate the RefindPlus-specific `disable_nvram_protect` setting to switch this feature off.
 - **Mac Legacy BIOS Boot:** RefindPlus originally assumed all Macs were capable of legacy BIOS boot based on code that went in upstream back in 2012 when this was a reasonable default. However, some later Intel Macs do not support legacy BIOS boot and RefindPlus now attempts to categorise Macs to enable/disable legacy BIOS boot accordingly.
   - > Activate the RefindPlus-specific `disable_legacy_sync` setting to keep the old assumption.
-- **Secondary Configuration Files:** While the upstream documentation prohibits including tertiary configuration files from secondary configuration files, there is no apparent mechanism enforcing this prohibition. Hence, tertiary and more configuration files can in fact be included.
+- **Secondary Configuration Files:** While the upstream documentation prohibits including tertiary configuration files from secondary configuration files, there is no apparent mechanism enforcing this prohibition.
   - > RefindPlus enforces the limitation for inclusion to secondary configuration files.
-- **Shortcut Keys:** RefindPlus does not allocate shortcut keys based on the operating system type/name as there is no way of knowing what would actually be loaded in many cases.
+- **Shortcut Keys:** RefindPlus does not allocate shortcut keys based on the operating system type/name as there is no way of knowing what would actually be allocate in most cases.
   - > Keys are allocated based on display position in the order of `Key 1` to `Key Z`.
   - > Alphabetic `Keys I and O` are not used, while Numeric `Key 0` is reserved for internal use.
   - > Keys are not allocated to `Tools` apart from `Key A` for `About Refindplus` and `Key Z` for `System Shutdown`.

@@ -58,6 +58,7 @@
 #include "install.h"
 #include "screenmgt.h"
 #include "mystrings.h"
+#include "snapshots.h"
 #include "launch_efi.h"
 #include "launch_legacy.h"
 #include "driver_support.h"
@@ -563,6 +564,11 @@ REFIT_MENU_SCREEN * InitializeSubScreen (
                                 L"Instance: Linux - %s",
                                 ShowName
                             );
+
+                            if (Entry->Volume->OSIconName == NULL) {
+                                Entry->Volume->OSIconName = StrDuplicate (ShowName);
+                                ToLower (Entry->Volume->OSIconName);
+                            }
                         }
                         else if (Entry->OSType == 'G') {
                             DisplayName = PoolPrint (
@@ -657,6 +663,7 @@ VOID GenerateSubScreen (
     UINTN                    i;
     UINTN                    TokenCount;
     CHAR16                  *InitrdName;
+    CHAR16                  *OptionsBase;
     CHAR16                  *KernelVersion;
     CHAR16                 **TokenList;
     BOOLEAN                  UseSysAPFS;
@@ -722,7 +729,7 @@ VOID GenerateSubScreen (
         );
         if (SubEntry != NULL) {
             SubEntry->me.Title = StrDuplicate (
-                L"Load Instance: Mac OS in Verbose Mode"
+                L"Load Instance: Mac OS in Mode - Verbose"
             );
             SubEntry->LoadOptions = StrDuplicate (L"-v");
             SubEntry->UseGraphicsMode = FALSE;
@@ -736,7 +743,7 @@ VOID GenerateSubScreen (
         );
         if (SubEntry != NULL) {
             SubEntry->me.Title = StrDuplicate (
-                L"Load Instance: Mac OS in Verbose Mode (64-bit)"
+                L"Load Instance: Mac OS in Mode - Verbose (64-bit)"
             );
             SubEntry->LoadOptions = StrDuplicate (L"-v arch=x86_64");
             SubEntry->UseGraphicsMode = FALSE;
@@ -751,7 +758,7 @@ VOID GenerateSubScreen (
         );
         if (SubEntry != NULL) {
             SubEntry->me.Title = StrDuplicate (
-                L"Load Instance: Mac OS in Verbose Mode (32-bit)"
+                L"Load Instance: Mac OS in Mode - Verbose (32-bit)"
             );
             SubEntry->LoadOptions = StrDuplicate (L"-v arch=i386");
             SubEntry->UseGraphicsMode = FALSE;
@@ -764,7 +771,7 @@ VOID GenerateSubScreen (
             SubEntry = CopyLoaderEntry (Entry);
             if (SubEntry != NULL) {
                 SubEntry->me.Title = StrDuplicate (
-                    L"Load Instance: Mac OS in Safe Mode (Laconic)"
+                    L"Load Instance: Mac OS in Mode - Safe (Laconic)"
                 );
                 SubEntry->LoadOptions = StrDuplicate (L"-x");
                 SubEntry->UseGraphicsMode = FALSE;
@@ -774,7 +781,7 @@ VOID GenerateSubScreen (
             SubEntry = CopyLoaderEntry (Entry);
             if (SubEntry != NULL) {
                 SubEntry->me.Title = StrDuplicate (
-                    L"Load Instance: Mac OS in Safe Mode (Verbose)"
+                    L"Load Instance: Mac OS in Mode - Safe (Verbose)"
                 );
                 SubEntry->LoadOptions = StrDuplicate (L"-v -x");
                 SubEntry->UseGraphicsMode = FALSE;
@@ -787,7 +794,7 @@ VOID GenerateSubScreen (
             SubEntry = CopyLoaderEntry (Entry);
             if (SubEntry != NULL) {
                 SubEntry->me.Title = StrDuplicate (
-                    L"Load Instance: Mac OS in SingleUser Mode (Laconic)"
+                    L"Load Instance: Mac OS in Mode - SingleUser (Laconic)"
                 );
                 SubEntry->LoadOptions = StrDuplicate (L"-s");
                 SubEntry->UseGraphicsMode = FALSE;
@@ -799,7 +806,7 @@ VOID GenerateSubScreen (
             );
             if (SubEntry != NULL) {
                 SubEntry->me.Title = StrDuplicate (
-                    L"Load Instance: Mac OS in SingleUser Mode (Verbose)"
+                    L"Load Instance: Mac OS in Mode - SingleUser (Verbose)"
                 );
                 SubEntry->LoadOptions = StrDuplicate (L"-v -s");
                 SubEntry->UseGraphicsMode = FALSE;
@@ -975,6 +982,25 @@ VOID GenerateSubScreen (
             MY_FREE_POOL(KernelVersion);
             MY_FREE_POOL(InitrdName);
             MY_FREE_FILE(File);
+
+            BREAD_CRUMB(L"%a:  2a 7", __func__);
+            OptionsBase = NULL;
+            if (SubScreen->Entries    != NULL &&
+                SubScreen->Entries[0] != NULL
+            ) {
+                BREAD_CRUMB(L"%a:  2a 7a 1", __func__);
+                OptionsBase = (
+                    (LOADER_ENTRY *)SubScreen->Entries[0]
+                )->LoadOptions;
+                BREAD_CRUMB(L"%a:  2a 7a 2", __func__);
+            }
+
+            BREAD_CRUMB(L"%a:  2a 8", __func__);
+            AddBaseSnapshots (
+                Entry, SubScreen, OptionsBase
+            );
+
+            BREAD_CRUMB(L"%a:  2a 9", __func__);
         } // if File
 
         BREAD_CRUMB(L"%a:  A2 - OSType L:- END", __func__);
@@ -1138,7 +1164,7 @@ VOID SetLoaderDefaults (
         ) {
             BREAD_CRUMB(L"%a:  2b 2a 1", __func__);
             // Grub is Often Wrongly Set as linux
-            Entry->OSType = 'G';
+            Entry->OSType =  'G';
         }
         else {
             BREAD_CRUMB(L"%a:  2b 2b 1", __func__);
@@ -1147,7 +1173,7 @@ VOID SetLoaderDefaults (
                 if (IsStriStr (NameClues, L"opencore")) {
                     BREAD_CRUMB(L"%a:  2b 2b 1a 1a 1", __func__);
                     // OpenCore is Often Wrongly Set as Mac OS
-                    Entry->OSType = 'O';
+                    Entry->OSType =  'O';
                 }
                 else {
                     BREAD_CRUMB(L"%a:  2b 2b 1a 1b 1", __func__);
@@ -1697,7 +1723,7 @@ VOID SetLoaderDefaults (
                 }
 
                 BREAD_CRUMB(L"%a:  5a 1a 2", __func__);
-                Entry->OSType = 'R';
+                Entry->OSType =  'R';
             }
             else {
                 BREAD_CRUMB(L"%a:  5a 1b 1", __func__);
@@ -1708,7 +1734,7 @@ VOID SetLoaderDefaults (
                 }
 
                 BREAD_CRUMB(L"%a:  5a 1b 2", __func__);
-                Entry->OSType = 'M';
+                Entry->OSType =  'M';
                 if (!Entry->UseGraphicsMode) {
                     Entry->UseGraphicsMode = (
                         GlobalConfig.GraphicsFor & GRAPHICS_FOR_OSX
@@ -1733,7 +1759,7 @@ VOID SetLoaderDefaults (
             }
 
             BREAD_CRUMB(L"%a:  5b 2", __func__);
-            Entry->OSType = 'W';
+            Entry->OSType =  'W';
             if (!Entry->UseGraphicsMode) {
                 Entry->UseGraphicsMode = (
                     GlobalConfig.GraphicsFor & GRAPHICS_FOR_WINDOWS
@@ -1823,7 +1849,7 @@ VOID SetLoaderDefaults (
 
             BREAD_CRUMB(L"%a:  5d 3", __func__);
             GotFlag = TRUE;
-            Entry->OSType = 'L';
+            Entry->OSType =  'L';
             if (!Entry->UseGraphicsMode) {
                 Entry->UseGraphicsMode = (
                     GlobalConfig.GraphicsFor & GRAPHICS_FOR_LINUX
@@ -1910,7 +1936,7 @@ VOID SetLoaderDefaults (
             BREAD_CRUMB(L"%a:  5i_obsd 1", __func__);
             if (GetImage) {
                 MergeUniqueStrings (
-                    &TmpIconName, L"openbsd", L','
+                    &TmpIconName, L"openbsd,bsd", L','
                 );
             }
 
@@ -1922,7 +1948,7 @@ VOID SetLoaderDefaults (
             BREAD_CRUMB(L"%a:  5i_fbsd 1", __func__);
             if (GetImage) {
                 MergeUniqueStrings (
-                    &TmpIconName, L"freebsd", L','
+                    &TmpIconName, L"freebsd,bsd", L','
                 );
             }
 
@@ -1934,7 +1960,7 @@ VOID SetLoaderDefaults (
             BREAD_CRUMB(L"%a:  5i_dfly 1", __func__);
             if (GetImage) {
                 MergeUniqueStrings (
-                    &TmpIconName, L"dragonflybsd", L','
+                    &TmpIconName, L"dragonflybsd,bsd", L','
                 );
             }
 
@@ -1946,7 +1972,7 @@ VOID SetLoaderDefaults (
             BREAD_CRUMB(L"%a:  5i_nbsd 1", __func__);
             if (GetImage) {
                 MergeUniqueStrings (
-                    &TmpIconName, L"netbsd", L','
+                    &TmpIconName, L"netbsd,bsd", L','
                 );
             }
 
@@ -2381,7 +2407,7 @@ static
 LOADER_ENTRY * AddLoaderEntry (
     IN OUT CHAR16       *LoaderPath,
     IN     CHAR16       *LoaderTitle,
-    IN     REFIT_VOLUME *Volume,
+    IN OUT REFIT_VOLUME *Volume,
     IN     BOOLEAN       SubScreenReturn,
     IN     BOOLEAN       CheckLinux
 ) {
@@ -2442,22 +2468,22 @@ LOADER_ENTRY * AddLoaderEntry (
                 LoaderEntry->OSType = 'L';
             }
             else {
-                GotGrub = IsStriStr (LoaderPath, L"\\Grub");
-                if (GotGrub) {
-                    LoaderEntry->OSType = 'G';
+                GotElilo = IsStriStr (LoaderPath, L"\\Elilo");
+                if (GotElilo) {
+                    LoaderEntry->OSType = 'E';
                 }
                 else {
-                    GotSysD = (
-                        IsStriStr (LoaderPath, L"\\SystemD") ||
-                        IsStriStr (LoaderPath, L"\\GummiBoot")
-                    );
-                    if (GotSysD) {
-                        LoaderEntry->OSType = 'S';
+                    GotGrub = IsStriStr (LoaderPath, L"\\Grub");
+                    if (GotGrub) {
+                        LoaderEntry->OSType = 'G';
                     }
                     else {
-                        GotElilo = IsStriStr (LoaderPath, L"\\Elilo");
-                        if (GotElilo) {
-                            LoaderEntry->OSType = 'E';
+                        GotSysD = (
+                            IsStriStr (LoaderPath, L"\\SystemD") ||
+                            IsStriStr (LoaderPath, L"\\GummiBoot")
+                        );
+                        if (GotSysD) {
+                            LoaderEntry->OSType = 'S';
                         }
                     }
                 }
@@ -2496,6 +2522,11 @@ LOADER_ENTRY * AddLoaderEntry (
                         ShowName = GetShowName (
                             LinuxName
                         );
+
+                        if (Volume->OSIconName == NULL) {
+                            Volume->OSIconName = StrDuplicate (ShowName);
+                            ToLower (Volume->OSIconName);
+                        }
 
                         LoaderEntry->Title = (
                             !GotGrub && !GotSysD && !GotElilo && !GotUKI
@@ -2611,6 +2642,11 @@ LOADER_ENTRY * AddLoaderEntry (
                         ShowName = GetShowName (
                             LinuxName
                         );
+
+                        if (Volume->OSIconName == NULL) {
+                            Volume->OSIconName = StrDuplicate (ShowName);
+                            ToLower (Volume->OSIconName);
+                        }
 
                         LoaderEntry->Title = (IsStub)
                             ? (KernFile == NULL)

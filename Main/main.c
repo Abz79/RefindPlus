@@ -173,14 +173,15 @@ REFIT_CONFIG GlobalConfig = {
     .ScreensaverTime           =                       0,
     .Timeout                   =                       0,
     .ScaleUI                   =                       0,
-    .DynamicCSR                =                       0,
     .LogLevel                  =                       0,
+    .DynamicCSR                =                       0,
     .IconRowMove               =                       0,
     .IconRowTune               =                       0,
     .BadRamTagType             =                       0,
     .ScreenR                   =                      -1,
     .ScreenG                   =                      -1,
     .ScreenB                   =                      -1,
+    .MaxSnapshots              =                      10,
     .DiscoveredRoot            =                    NULL,
     .SelfDevicePath            =                    NULL,
     .ScreenBackground          =                    NULL,
@@ -621,9 +622,13 @@ EFI_STATUS EFIAPI gRTSetVariableEx (
     );
 
     #if REFIT_DEBUG > 0
-    LogStatus = NULL;
-    if (!gKernelStarted) {
-        // Log Outcome
+    /* Enable Forced Native Logging */
+    MY_NATIVELOGGER_SET;
+
+    if (gKernelStarted) {
+        LogStatus = NULL;
+    }
+    else {
         LogStatus = PoolPrint (
             L"%r",
             (FlagBlock) ? EFI_ACCESS_DENIED : Status
@@ -631,19 +636,16 @@ EFI_STATUS EFIAPI gRTSetVariableEx (
         LimitStringLength (LogStatus, 18);
     }
 
-    /* Enable Forced Native Logging */
-    MY_NATIVELOGGER_SET;
-
     if (!gKernelStarted) {
         LogNameTmp = NULL;
         if (GuidsAreEqual (VendorGuid, &gEfiImageSecurityDatabaseGuid)) {
             if (0);
-            else if (MyStriCmp (VariableName, L"db") ) LogNameTmp = L"EFI_IMAGE_SECURITY_DATABASE0";
+            else if (MyStriCmp (VariableName, L"db" )) LogNameTmp = L"EFI_IMAGE_SECURITY_DATABASE0";
             else if (MyStriCmp (VariableName, L"dbx")) LogNameTmp = L"EFI_IMAGE_SECURITY_DATABASE1";
             else if (MyStriCmp (VariableName, L"dbt")) LogNameTmp = L"EFI_IMAGE_SECURITY_DATABASE2";
             else if (MyStriCmp (VariableName, L"dbr")) LogNameTmp = L"EFI_IMAGE_SECURITY_DATABASE3";
             else if (MyStriCmp (VariableName, L"KEK")) LogNameTmp = L"EFI_KEY_EXCHANGE_KEY_NAME"   ;
-            else if (MyStriCmp (VariableName, L"PK") ) LogNameTmp = L"EFI_PLATFORM_KEY_NAME"       ;
+            else if (MyStriCmp (VariableName, L"PK" )) LogNameTmp = L"EFI_PLATFORM_KEY_NAME"       ;
         }
 
         LogNameFull = StrDuplicate (
@@ -3157,15 +3159,6 @@ VOID AboutRefindPlus (VOID) {
         TRUE
     );
 
-    AddMenuInfoLine (
-        AboutMenu,
-        PoolPrint (
-            L"Legacy Boot        : %s",
-            FlagCSM
-        ),
-        TRUE
-    );
-
     // Always show CSR status on  Mac.
     // Even if Mac OS is not detected.
     // Only if Mac OS is active on PC.
@@ -3209,6 +3202,15 @@ VOID AboutRefindPlus (VOID) {
         );
         MY_FREE_POOL(TmpStr);
     }
+
+    AddMenuInfoLine (
+        AboutMenu,
+        PoolPrint (
+            L"Legacy Boot        : %s",
+            FlagCSM
+        ),
+        TRUE
+    );
 
     AddMenuInfoLine (
         AboutMenu,

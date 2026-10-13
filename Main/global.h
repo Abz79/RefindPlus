@@ -573,14 +573,15 @@ typedef struct {
     INTN                        ScreensaverTime;
     INTN                        Timeout;
     INTN                        ScaleUI;
-    INTN                        DynamicCSR;
     INTN                        LogLevel;
+    INTN                        DynamicCSR;
     INTN                        IconRowMove;
     INTN                        IconRowTune;
     INTN                        BadRamTagType;
     INTN                        ScreenR;
     INTN                        ScreenG;
     INTN                        ScreenB;
+    INTN                        MaxSnapshots;
     REFIT_VOLUME               *DiscoveredRoot;
     EFI_DEVICE_PATH_PROTOCOL   *SelfDevicePath;
     EG_IMAGE                   *ScreenBackground;

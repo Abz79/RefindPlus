@@ -69,6 +69,9 @@ typedef struct {
     CHAR16  *End16Ptr;
 } REFIT_FILE;
 
+#define MIN_SNAPSHOTS            (0)
+#define MAX_SNAPSHOTS           (99)
+
 #define DONT_SCAN_VOLUMES L"LRS_ESP"
 #define ALSO_SCAN_DIRS    L"boot,@/boot"
 

@@ -24,7 +24,7 @@
  */
 /**
 ** Modified for RefindPlus
-** Copyright (c) 2020-2025 Dayo Akanji (sf.net/u/dakanji/profile)
+** Copyright (c) 2020-2026 Dayo Akanji (sf.net/u/dakanji/profile)
 **
 ** Modifications distributed under the preceding terms.
 **/
@@ -45,8 +45,17 @@ typedef struct _string_list {
     struct _string_list  *Next;
 } STRING_LIST;
 
+
+
 // DA-TAG: See here for more if needed:
 //         https://www.virtualbox.org/svn/vbox/trunk/src/VBox/Devices/EFI/Firmware/MdePkg/Library/BaseLib/String.c
+
+
+
+EFI_GUID StringAsGuid (CHAR16 *InString);
+
+
+
 BOOLEAN IsValidHex (IN CHAR16 *Input);
 BOOLEAN IsGuid (IN CHAR16 *UnknownString);
 BOOLEAN IsIn (IN CHAR16 *SmallString, IN CHAR16 *List);
@@ -92,6 +101,8 @@ BOOLEAN IsStriStr (
     IN CHAR16 *SmallStr
 );
 
+
+
 CHAR16 * FindNumbers (IN CHAR16 *InString);
 CHAR16 * GuidAsString (EFI_GUID *GuidData);
 CHAR16 * SanitiseString (CHAR16 *InString);
@@ -119,6 +130,8 @@ CHAR16 * CapitalisedCase (
     IN CHAR16  *InputString,
     IN BOOLEAN  SpecialCases
 );
+
+
 
 VOID ToUpper (IN OUT CHAR16 *MyString);
 VOID ToLower (IN OUT CHAR16 *MyString);
@@ -153,10 +166,7 @@ VOID MyUnicodeFilterString (
     IN     BOOLEAN   SingleLine
 );
 
-CHAR8 * MyAsciiStrStr (
-    IN const CHAR8 *String,
-    IN const CHAR8 *SearchString
-);
+
 
 UINTN CountListItems (IN CHAR16 *InString);
 UINTN NumCharsInCommon (
@@ -164,13 +174,22 @@ UINTN NumCharsInCommon (
     IN CHAR16 *String2
 );
 
+
+
+CHAR8 * MyAsciiStrStr (
+    IN const CHAR8 *String,
+    IN const CHAR8 *SearchString
+);
+
+
+
 UINT64 StrToHex (
     IN CHAR16 *OurStr,
     IN UINTN   Pos,
     IN UINTN   NumChars
 );
 
-EFI_GUID StringAsGuid (CHAR16 *InString);
+
 
 EFI_STATUS SafeStrCat (
     OUT       CHAR16 *Dest,

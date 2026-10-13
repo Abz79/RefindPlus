@@ -62,7 +62,7 @@ body:
       label: RefindPlus Version
       description: Which version of RefindPlus is affected?
       options:
-        - 'Official v0.14.2.AE Release'
+        - 'Official v0.14.2.AF Release'
         - 'Official Older Released Version'
         - 'Official Pre-Release Code Build'
         - 'Unofficially Modified Code Build'

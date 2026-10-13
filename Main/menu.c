@@ -962,7 +962,9 @@ VOID ComputeSubScreenWindowSize (
     *LineWidth = *Width;
 
     if (Screen->TitleImage) {
-        *Width += (Screen->TitleImage->Width + (TITLEICON_SPACING * 2) + FontCellWidth);
+        *Width += (
+            Screen->TitleImage->Width + (TITLEICON_SPACING * 2) + FontCellWidth
+        );
     }
     else {
         *Width += FontCellWidth;
@@ -1109,7 +1111,9 @@ VOID PaintAll (
     ) {
         DrawTextWithTransparency (
             Screen->Entries[State->CurrentSelection]->Title,
-            (ScreenW - egComputeTextWidth (Screen->Entries[State->CurrentSelection]->Title)) >> 1,
+            (ScreenW - egComputeTextWidth (
+                Screen->Entries[State->CurrentSelection]->Title)
+            ) >> 1,
             textPosY
         );
     }
@@ -1197,7 +1201,9 @@ VOID PaintSelection (
     ) {
         DrawTextWithTransparency (
             Screen->Entries[State->CurrentSelection]->Title,
-            (ScreenW - egComputeTextWidth (Screen->Entries[State->CurrentSelection]->Title)) >> 1,
+            (ScreenW - egComputeTextWidth (
+                Screen->Entries[State->CurrentSelection]->Title)
+            ) >> 1,
             textPosY
         );
     }
@@ -1353,8 +1359,8 @@ VOID PaintArrows (
 } // static VOID PaintArrows()
 
 // Enable the user to edit boot loader options.
-// Returns TRUE if the user exited with edited options; FALSE if the user
-// pressed Esc to terminate the edit.
+// Returns TRUE if the user exited with edited options;
+// FALSE if the user pressed Esc to terminate the edit.
 static
 BOOLEAN EditOptions (
     LOADER_ENTRY *MenuEntry
@@ -1464,10 +1470,9 @@ VOID AddToHiddenTags (
     MY_FREE_POOL(HiddenTags);
 } // static VOID AddToHiddenTags()
 
-// Adds a filename, specified by the *Loader variable, to the *VarName UEFI variable,
-// using the mostly-prepared *HideEfiMenu structure to prompt the user to confirm
-// hiding that item.
-// Returns TRUE if item was hidden, FALSE otherwise.
+// Adds a filename, specified by the Loader variable, to the VarName variable,
+// using the mostly-prepared *HideEfiMenu structure to prompt the user to
+// confirm hiding that item. Returns TRUE if item was hidden, FALSE otherwise.
 static
 BOOLEAN HideEfiTag (
     LOADER_ENTRY      *Loader,

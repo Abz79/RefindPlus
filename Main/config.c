@@ -72,6 +72,7 @@ refind_linux.conf,refind-linux.conf"
 #define LAST_MINUTE                      (1439) /* Last minute of a day */
 
 INTN                   LogLevelConfig  =     0;
+INTN                   InputSnapshots  =     0;
 
 UINTN                  TotalEntryCount =     0;
 UINTN                  ValidEntryCount =     0;
@@ -278,7 +279,7 @@ VOID SyncShowTools (VOID) {
         E_S(TAG_HIDDEN,             1);
         E_S(TAG_CSR_ROTATE,         2);
         E_S(TAG_BOOTORDER,          3);
-        E_S(TAG_SHUTDOWN,           5);
+        E_S(TAG_SHUTDOWN,           4);
         GlobalConfig.HiddenTags = TRUE;
     }
 } // static VOID SyncShowTools()
@@ -2939,6 +2940,7 @@ VOID ReadConfig (
                     }
                     else {
                         if (0);
+                        // MyStriCmp (Flag, x) ... GlobalConfig.HideUIFlags |= x
                         else if (FLAG_X(L"label"     )) Q_H(HIDEUI_FLAG_LABEL     );
                         else if (FLAG_X(L"hints"     )) Q_H(HIDEUI_FLAG_HINTS     );
                         else if (FLAG_X(L"banner"    )) Q_H(HIDEUI_FLAG_BANNER    );
@@ -3007,6 +3009,7 @@ VOID ReadConfig (
                     }
                     else {
                         if (0);
+                        // MyStriCmp (Flag, x) ... GlobalConfig.GraphicsFor |= x
                         else if (FLAG_X(L"osx"     )) Q_G(GRAPHICS_FOR_OSX     );
                         else if (FLAG_X(L"grub"    )) Q_G(GRAPHICS_FOR_GRUB    );
                         else if (FLAG_X(L"tools"   )) Q_G(GRAPHICS_FOR_TOOLS   );
@@ -3057,6 +3060,7 @@ VOID ReadConfig (
                     }
                     else {
                         if (0);
+                        // MyStriCmp (Flag, x) ... GlobalConfig.SyncTrust |= x
                         else if (FLAG_X(L"macos"   )) Q_S(ENFORCE_TRUST_MACOS   );
                         else if (FLAG_X(L"linux"   )) Q_S(ENFORCE_TRUST_LINUX   );
                         else if (FLAG_X(L"windows" )) Q_S(ENFORCE_TRUST_WINDOWS );
@@ -3338,7 +3342,7 @@ VOID ReadConfig (
             SetShowTools = TRUE;
             for (j = 0; j < NUM_TOOLS; j++) {
                 if (GlobalConfig.ShowTools[j] == TAG_BASE) break;
-                E_S(TAG_BASE, j);
+                GlobalConfig.ShowTools[j] = TAG_BASE;
             } // for
 
             DoneTool = FALSE;
@@ -3353,7 +3357,7 @@ VOID ReadConfig (
                     i >= (LIM_TOOLS + InvalidEntries)
                 ) {
                     // Break Loop
-                    break;
+                    break;  // OUTER
                 }
 
                 // Set Showtools Index
@@ -3371,10 +3375,11 @@ VOID ReadConfig (
                         GlobalConfig.ShowTools[k] == TAG_BASE
                     ) {
                         // Break Loop
-                        break;
+                        break;  // INNER
                     }
 
                     if (0);
+                    // MyStrBegins (x, Flag) ... GlobalConfig.ShowTools[k] == x
                     else if (X_FLAG(L"mok_tool"        ) && C_S(TAG_MOK,          k)) DupTag = TRUE;
                     else if (X_FLAG(L"exit"            ) && C_S(TAG_EXIT,         k)) DupTag = TRUE;
                     else if (X_FLAG(L"about"           ) && C_S(TAG_ABOUT,        k)) DupTag = TRUE;
@@ -3398,7 +3403,7 @@ VOID ReadConfig (
                     if (DupTag) {
                         Flag = L"Duplicate";
 
-                        break;
+                        break;  // INNER
                     }
 
                     // Iterate counter
@@ -3406,6 +3411,7 @@ VOID ReadConfig (
                 } // while {Infinite} ... INNER
 
                 if (0);
+                // MyStrBegins (x, Flag) ... GlobalConfig.ShowTools[j] = x
                 else if (X_FLAG(L"mok_tool"        )) E_S(TAG_MOK,          j );
                 else if (X_FLAG(L"exit"            )) E_S(TAG_EXIT,         j );
                 else if (X_FLAG(L"about"           )) E_S(TAG_ABOUT,        j );
@@ -3450,7 +3456,7 @@ VOID ReadConfig (
 
                     // Skip 'DoneTool' Update
                     // In case this is the first entry
-                    continue;
+                    continue;  // OUTER
                 }
 
                 // Update 'DoneTool' if false
@@ -3488,6 +3494,7 @@ VOID ReadConfig (
             #endif
 
             Flag = TokenList[1];
+            // MyStriCmp (Flag, x)
             if (FLAG_X(L"noscale")) {
                 GlobalConfig.BannerScale = BANNER_NOSCALE;
             }
@@ -4743,6 +4750,28 @@ VOID ReadConfig (
             );
         }
         else if (
+            TokenCount == 2 &&
+            MyStriCmp (TokenList[0], L"max_snapshots")
+        ) {
+            #if REFIT_DEBUG > 0
+            if (!OuterLoop) {
+                UpdatedToken = LogUpdate (
+                    TokenList[0], NotRunBefore, TRUE
+                );
+            }
+            #endif
+
+            HandleSignedInt (
+                TokenList, TokenCount,
+                &InputSnapshots
+            );
+
+            if (InputSnapshots < MIN_SNAPSHOTS) InputSnapshots = MIN_SNAPSHOTS;
+            if (InputSnapshots > MAX_SNAPSHOTS) InputSnapshots = MAX_SNAPSHOTS;
+            GlobalConfig.MaxSnapshots = InputSnapshots;
+        }
+        else if (
+            TokenCount == 2 &&
             MyStriCmp (TokenList[0], L"max_tags")
         ) {
             #if REFIT_DEBUG > 0

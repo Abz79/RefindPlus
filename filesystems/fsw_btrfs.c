@@ -1453,6 +1453,7 @@ begin_direct_read:
 
         if (challoc) {
             FreePool(chunk);
+            /* coverity[assigned_pointer: SUPPRESS] */
             chunk = NULL;
         }
         challoc = 0;
@@ -3238,10 +3239,8 @@ fsw_status_t fsw_btrfs_dir_read (
                 child_dno_out
             );
             if (!err) {
-                if (direl) {
-                    FreePool(direl);
-                    direl = NULL;
-                }
+                FreePool(direl);
+                direl = NULL;
                 fsw_btrfs_free_iterator (&desc);
 
                 shand->pos = key_out.offset;

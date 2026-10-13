@@ -49,6 +49,7 @@
     Main/pointer.c
     Main/scan.c
     Main/screenmgt.c
+    Main/snapshots.c
     EfiLib/AcquireGOP.c
     EfiLib/AmendSysTable.c
     EfiLib/BmLib.c
