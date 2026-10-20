@@ -110,6 +110,7 @@ VOID PauseForKey (VOID);
 VOID FixIconScale (VOID);
 VOID RefitDeadLoop (VOID);
 VOID TerminateScreen (VOID);
+extern CHAR16 *BlankLine;
 VOID BlankScreenLine (VOID);
 VOID FinishExternalScreen (VOID);
 VOID HaltSeconds (UINTN Seconds);

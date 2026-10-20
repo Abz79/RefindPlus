@@ -11,12 +11,12 @@
  */
 /*
  * Modified for RefindPlus
- * Copyright (c) 2020-2025 Dayo Akanji (sf.net/u/dakanji/profile)
+ * Copyright (c) 2020-2026 Dayo Akanji (sf.net/u/dakanji/profile)
  *
  * Modifications distributed under the preceding terms.
  */
 
 #define WIDE_STR2(x) L##x
 #define WIDE_STR(x) WIDE_STR2(x)
-#define VERSION_STRING_ASCII "0.14.2.AF"
+#define VERSION_STRING_ASCII "0.14.2.AF - ABZ MOD"
 #define REFINDPLUS_VERSION WIDE_STR(VERSION_STRING_ASCII)

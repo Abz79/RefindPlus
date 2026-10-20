@@ -18,7 +18,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-/**
+ /**
 ** Modified for RefindPlus
 ** Copyright (c) 2020-2026 Dayo Akanji (sf.net/u/dakanji/profile)
 **
@@ -49,10 +49,94 @@ EG_IMAGE                       *Background         =                            
 
 BOOLEAN                         MouseTouchActive   =                               TRUE;
 BOOLEAN                         PointerAvailable   =                              FALSE;
+BOOLEAN                         gSuppressPointerDraw =                              TRUE;
+BOOLEAN                         gPointerActuallyMoved =                            FALSE;
 POINTER_STATE                   State;
 
 extern BOOLEAN                  RunningOC;
 
+static EG_IMAGE *CreateFallbackNoTailCursor (VOID);
+static BOOLEAN   IsImageFullyTransparent (IN EG_IMAGE *Image);
+
+////////////////////////////////////////////////////////////////////////////////
+// Check if an image is fully transparent (all alpha values are 0)
+////////////////////////////////////////////////////////////////////////////////
+static
+BOOLEAN IsImageFullyTransparent (
+    EG_IMAGE *Image
+) {
+    UINTN x, y;
+
+    if (Image == NULL || Image->PixelData == NULL) {
+        return TRUE;
+    }
+
+    for (y = 0; y < Image->Height; y++) {
+        for (x = 0; x < Image->Width; x++) {
+            EG_PIXEL *Pixel = &Image->PixelData[y * Image->Width + x];
+            if (Pixel->a != 0) {
+                return FALSE;
+            }
+        }
+    }
+
+    return TRUE;
+} // static BOOLEAN IsImageFullyTransparent()
+
+////////////////////////////////////////////////////////////////////////////////
+// Create a fallback mouse cursor without tail (for MSI bug workaround)
+////////////////////////////////////////////////////////////////////////////////
+static
+EG_IMAGE *CreateFallbackNoTailCursor (VOID) {
+    UINTN x, y;
+
+    EG_IMAGE *Img = egCreateImage (32, 32, TRUE);
+    if (Img == NULL) {
+        return NULL;
+    }
+
+    // Palette: 0=Transparent, 1=Dark Outline, 2=White Fill
+    static const UINT8 Map[32][32] = {
+        {1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+        {1,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+        {1,2,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+        {1,2,2,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+        {1,2,2,2,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+        {1,2,2,2,2,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+        {1,2,2,2,2,2,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+        {1,2,2,2,2,2,2,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+        {1,2,2,2,2,2,2,2,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+        {1,2,2,2,2,2,2,2,2,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+        {1,2,2,2,2,2,2,2,2,2,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+        {1,2,2,2,2,2,2,2,2,2,2,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+        {1,2,2,2,2,2,2,2,2,2,2,2,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+        {1,2,2,2,2,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+        {1,2,2,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+        {1,2,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+        {1,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+        {1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+    };
+    for (y = 0; y < 32; y++) {
+        for (x = 0; x < 32; x++) {
+            EG_PIXEL *Pixel = &Img->PixelData[y * 32 + x];
+
+            switch (Map[y][x]) {
+                case 1:
+                    Pixel->r = 0x1A; Pixel->g = 0x1A; Pixel->b = 0x1A; Pixel->a = 0xFF;
+                    break;
+                case 2:
+                    Pixel->r = 0xFF; Pixel->g = 0xFF; Pixel->b = 0xFF; Pixel->a = 0xFF;
+                    break;
+                default:
+                    Pixel->r = 0x00; Pixel->g = 0x00; Pixel->b = 0x00; Pixel->a = 0x00;
+                    break;
+            }
+        }
+    }
+
+    Img->HasAlpha = TRUE;
+    return Img;
+} // static EG_IMAGE *CreateFallbackNoTailCursor()
 
 ////////////////////////////////////////////////////////////////////////////////
 // Frees allocated memory and closes pointer protocols
@@ -76,7 +160,7 @@ VOID pdCleanup (VOID) {
         return;
     }
 
-    pdClear (FALSE);
+    pdClear ();
 
     if (HandleA != NULL) {
         for (Index = 0; Index < NumAPointerDevices; Index++) {
@@ -98,7 +182,7 @@ VOID pdCleanup (VOID) {
 
     LastXPos = (
         ScreenW > 1
-    ) ? ScreenW / 2 : ScreenW;
+    ) ? ScreenW >> 2 : ScreenW;
     LastYPos = (
         ScreenH > 1
     ) ? ScreenH / 2 : ScreenH;
@@ -326,9 +410,39 @@ VOID pdInitialize (VOID) {
     }
     else {
         if (GlobalConfig.EnableMouse) {
-            MouseImage = BuiltinIcon (
-                BUILTIN_ICON_MOUSE
-            );
+            // If mouse support is enabled and no image was provided upstream,
+            // install a safe fallback cursor.
+            // This handles: missing mouse.png, MSI transparent bug, or load failures.
+            if (MouseImage == NULL) {
+                // Use egFindIcon directly to avoid caching issues
+                // mouse.png has ICON_SIZE_MOUSE size
+                MouseImage = egFindIcon (
+                    L"mouse",
+                    GlobalConfig.IconSizes[ICON_SIZE_MOUSE]
+                );
+
+                // Check if the loaded mouse icon is fully transparent (MSI bug workaround)
+                if (MouseImage != NULL && IsImageFullyTransparent(MouseImage)) {
+                    MY_FREE_IMAGE(MouseImage);
+                    MouseImage = NULL;
+
+                    #if REFIT_DEBUG > 0
+                    MsgStr = PoolPrint (
+                        L"Mouse Icon Fully Transparent ... Using Fallback Cursor"
+                    );
+                    ALT_LOG(1, LOG_THREE_STAR_MID, L"%s", MsgStr);
+                    LOG_MSG("%s  - %s", OffsetNext, MsgStr);
+                    MY_FREE_POOL(MsgStr);
+                    #endif
+                }
+            }
+
+            // If still no mouse image (not loaded, failed, or was transparent), use fallback
+            if (MouseImage == NULL) {
+                MouseImage = CreateFallbackNoTailCursor();
+            }
+
+            // If fallback failed, we simply operate without a cursor (safe - no hang)
         }
 
         // Form below is Deliberate for RunningOC
@@ -472,10 +586,12 @@ UINTN Int64ToUintn (
     return (UINTN) TempINT64;
 } // static UINTN Int64ToUintn()
 
+/*
 static
 BOOLEAN pdNotUsed (VOID) {
     return (!PointerAvailable || !MouseTouchActive);
 } // static BOOLEAN pdNotUsed()
+*/
 
 EFI_STATUS pdUpdateState (VOID) {
     EFI_STATUS                 Status;
@@ -491,7 +607,11 @@ EFI_STATUS pdUpdateState (VOID) {
 
     Status = EFI_NOT_READY;
 
-    if (pdNotUsed()) {
+    #if defined (EFI32) && defined (__MAKEWITH_GNUEFI)
+    return EFI_NOT_READY;
+    #endif
+
+    if (!PointerAvailable) {
         return Status;
     }
 
@@ -564,13 +684,20 @@ EFI_STATUS pdUpdateState (VOID) {
             else if (TargetY >= ScreenH) State.Y = Int64ToUintn (TempINT64);
             else                         State.Y = Int32ToUintn (TargetY);
 
-            State.Holding = SPointerState.LeftButton;
+            State.Holding = (SPointerState.LeftButton || SPointerState.RightButton);
 
             break; // 'for' loop
         } // for
     } while (0); // This 'loop' only runs once
 
     State.Press = (LastHolding && !State.Holding);
+
+    if (State.X != LastXPos || State.Y != LastYPos) {
+        gPointerActuallyMoved = TRUE;
+        if (gSuppressPointerDraw) {
+            gSuppressPointerDraw = FALSE;
+        }
+    }
 
     if (EFI_ERROR(Status)) {
         Status = EFI_NOT_READY;
@@ -587,6 +714,16 @@ POINTER_STATE pdGetState (VOID) {
 } // POINTER_STATE pdGetState()
 
 ////////////////////////////////////////////////////////////////////////////////
+// Set the pointer position
+////////////////////////////////////////////////////////////////////////////////
+VOID pdSetPosition (UINTN X, UINTN Y) {
+    State.X = X;
+    State.Y = Y;
+    LastXPos = X;
+    LastYPos = Y;
+} // VOID pdSetPosition()
+
+////////////////////////////////////////////////////////////////////////////////
 // Draw the mouse at the current coordinates
 ////////////////////////////////////////////////////////////////////////////////
 VOID pdDraw (VOID) {
@@ -594,41 +731,48 @@ VOID pdDraw (VOID) {
     UINTN Height;
 
 
-    if (pdNotUsed() ||
-        MouseImage  == NULL
-    ) {
+    if (!MouseTouchActive) {
         return;
     }
 
-    Width = (
-        (State.X + MouseImage->Width) > ScreenW
-    ) ? ScreenW - State.X : MouseImage->Width;
-    Height = (
-        (State.Y + MouseImage->Height) > ScreenH
-    ) ? ScreenH - State.Y : MouseImage->Height;
+    if (gSuppressPointerDraw) {
+        return;
+    }
 
-    MY_FREE_IMAGE(Background);
-    Background = egCopyScreenArea (
-        State.X, State.Y,
-        Width, Height
-    );
     if (Background != NULL) {
-        BltImageCompositeAny (
-            Background, MouseImage,
-            NULL, State.X, State.Y
+        egDrawImage (Background, LastXPos, LastYPos);
+        MY_FREE_IMAGE(Background);
+    }
+
+    if (MouseImage != NULL) {
+        Width = (
+            (State.X + MouseImage->Width) > ScreenW
+        ) ? ScreenW - State.X : MouseImage->Width;
+        Height = (
+            (State.Y + MouseImage->Height) > ScreenH
+        ) ? ScreenH - State.Y : MouseImage->Height;
+
+        Background = egCopyScreenArea (
+            State.X, State.Y,
+            Width, Height
         );
+        if (Background != NULL) {
+            BltImageCompositeAny (
+                Background, MouseImage,
+                NULL, State.X, State.Y
+            );
+        }
     }
 
     LastXPos = State.X;
     LastYPos = State.Y;
+    gPointerActuallyMoved = FALSE;
 } // VOID pdDraw()
 
 ////////////////////////////////////////////////////////////////////////////////
 // Restores the background at the position the mouse was last drawn
 ////////////////////////////////////////////////////////////////////////////////
-VOID pdClear (
-    BOOLEAN VetStatus
-) {
+VOID pdClear (VOID) {
     #if REFIT_DEBUG > 0
     CHAR16 *MsgStr;
 
@@ -636,9 +780,7 @@ VOID pdClear (
     #endif
 
 
-    if (VetStatus &&
-        pdNotUsed()
-    ) {
+    if (!MouseTouchActive) {
         return;
     }
 

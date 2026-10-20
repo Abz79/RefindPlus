@@ -38,7 +38,8 @@
 #ifndef _EFI_POINT_H
 #include "../EfiLib/AbsolutePointer.h"
 #endif
-
+extern BOOLEAN gSuppressPointerDraw;
+extern BOOLEAN gPointerActuallyMoved;
 typedef struct PointerStateStruct {
     UINTN         X;
     UINTN         Y;
@@ -66,9 +67,8 @@ typedef struct PointerStateStruct {
 
 VOID pdInitialize (VOID);
 VOID pdDraw (VOID);
-VOID pdClear (
-    BOOLEAN VetStatus
-);
+VOID pdClear (VOID);
+VOID pdSetPosition (UINTN X, UINTN Y);
 
 UINTN pdCount (VOID);
 
