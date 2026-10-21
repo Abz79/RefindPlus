@@ -3234,6 +3234,8 @@ BOOLEAN ShowInfoShell (
         StartTool((LOADER_ENTRY*)ShellEntryItems[0]); // Direct executionAdd commentMore actions
         return TRUE;
       }
+
+    return FALSE;
 } // static BOOLEAN ShowInfoShell()
 
 static

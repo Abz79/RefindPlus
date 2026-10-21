@@ -14,6 +14,23 @@ extern VOID RefitStall (
     UINTN StallLoops
 );
 
+// Memory Helpers ... Defined in libeg/lodepng_xtra.c ... Used by libeg/nanojpeg.c
+// Note: UINTN is used for the size parameters. This is deliberate. The
+//       'size_t' type is not consistent across the code base, as it is
+//       macro-redefined to UINTN within libeg/lodepng.h
+
+extern VOID * MyMemSet (
+    VOID   *s,
+    int     c,
+    UINTN   n
+);
+
+extern VOID * MyMemCpy (
+    VOID   *__restrict dest,
+    VOID   *__restrict src,
+    UINTN   n
+);
+
 // Control NativeLogger ... Especially Nested Instances
 #define MY_NATIVELOGGER_SET                             \
     do {                                                \

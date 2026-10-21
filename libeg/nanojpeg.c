@@ -124,12 +124,12 @@
 #ifndef _NANOJPEG_H
 #define _NANOJPEG_H
 
-// Modified: Map libc-style free() and malloc() to their EFI equivalents.
-#define free FreePool
-#define malloc AllocatePool
-#define memset(b, c, v) MyMemSet(b, v, c)
-#define memcpy MyMemCpy
-
+// Note: The libc-to-EFI mappings (free/malloc/memset/memcpy) are defined
+//       further down, within the 'NJ_USE_LIBC' block. They MUST be defined
+//       after <stdlib.h> and <string.h> have been included. Defining them
+//       earlier also rewrites the *declarations* within those headers,
+//       which produces conflicting declarations for AllocatePool, FreePool
+//       and MyMemSet (LTO type-mismatch warnings).
 
 // nj_result_t: Result codes for njDecode().
 typedef enum _nj_result {
@@ -292,6 +292,16 @@ int main(int argc, char* argv[]) {
 #if NJ_USE_LIBC
 #   include <stdlib.h>
 #   include <string.h>
+#   include <Library/MemoryAllocationLib.h>
+// Modified: Map libc-style free() and malloc() to their EFI equivalents.
+// NOTE: These must follow the includes above. Defining them earlier would
+//       also rewrite the declarations within <stdlib.h> and <string.h>,
+//       which produces conflicting declarations for AllocatePool, FreePool
+//       and MyMemSet (LTO type-mismatch warnings).
+#   define free FreePool
+#   define malloc AllocatePool
+#   define memset(b, c, v) MyMemSet(b, c, v)
+#   define memcpy MyMemCpy
 #   define njAllocMem malloc
 #   define njFreeMem  free
 #   define njFillMem  memset

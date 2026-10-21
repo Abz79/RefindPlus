@@ -2198,8 +2198,6 @@ UINTN DrawMenuScreen (
     INTN                        PreviousTime = -1; // MODIFIED: Initialize to a value that ensures initial display
     INTN                        CurrentTime;
     INTN                        ShortcutEntry;
-    UINTN                       ElapsCount;
-    UINTN                       Input;
     UINTN                       Item;
     UINTN                       MenuExit;
     UINT64                      MenuExitNumb;

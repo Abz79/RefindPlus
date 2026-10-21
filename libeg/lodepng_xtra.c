@@ -110,11 +110,11 @@ VOID * lodepng_refit_realloc (
 VOID * MyMemSet (
     VOID   *s,
     int     c,
-    size_t  n
+    UINTN   n
 ) {
     REFIT_CALL_3_WRAPPER(
         gBS->SetMem, s,
-        c, n
+        n, c
     );
 
     return s;
@@ -126,7 +126,7 @@ VOID * MyMemSet (
 VOID * MyMemCpy (
     VOID   *__restrict __dest,
     VOID   *__restrict __src,
-    size_t  __n
+    UINTN   __n
 ) {
     REFIT_CALL_3_WRAPPER(
         gBS->CopyMem, __dest,
