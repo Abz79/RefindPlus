@@ -2767,6 +2767,7 @@ UINTN DrawMenuScreen (
                         ALT_LOG(1, LOG_LINE_NORMAL,
                             L"Process Pointer Event ... Arrow Left"
                         );
+                    }
                     #endif
 
                 break;
