@@ -5855,31 +5855,6 @@ EFI_STATUS EFIAPI efi_main (
             continue;
         }
 
-        if (!OneMainLoop &&
-            ChosenOption->Tag == TAG_REBOOT
-        ) {
-            // Flag at least one loop done
-            OneMainLoop = TRUE;
-
-            #if REFIT_DEBUG > 0
-            LOG_MSG(
-                "INFO: Invalid Post-Load Reboot Call ... Ignore Reboot Call"
-            );
-            TypeStr = L"Mitigated Potential Persistent Primed Keystroke Buffer";
-            ALT_LOG(1, LOG_STAR_SEPARATOR, L"%s", TypeStr);
-            LOG_MSG("%s      %s", OffsetNext, TypeStr);
-            LOG_MSG("\n\n");
-            #endif
-
-            TypeStr = L"Aborted Invalid System Reset Call ... Please Try Again";
-            egDisplayMessage (
-                TypeStr, &BGColorFail,
-                CENTER, 4, L"PauseSeconds"
-            );
-
-            continue;
-        }
-
         if (MenuExit == MENU_EXIT_TIMEOUT &&
             GlobalConfig.ShutdownAfterTimeout
         ) {

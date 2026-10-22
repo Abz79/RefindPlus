@@ -2826,6 +2826,14 @@ UINTN DrawMenuScreen (
                     else {
                         MenuExit = MENU_EXIT_ENTER;
 
+                        // DA-TAG: Flag 'UserKeyPress' on Pointer Clicks
+                        //         A Pointer Click is Genuine User Input
+                        //         ... Just Like an 'Enter' Keystroke
+                        //         Without This ... The Primed Buffer Mitigation
+                        //         ... Below Discards the Selection
+                        //         ... And Requires a Second Click
+                        UserKeyPress = TRUE;
+
                         // Log Pointer Event
                         #if REFIT_DEBUG > 0
                         ALT_LOG(1, LOG_LINE_NORMAL,
