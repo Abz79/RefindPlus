@@ -1,0 +1,21 @@
+# End-of-line handling.
+#
+# Upstream RefindPlus stores most files with CRLF in the repository, but a few
+# files (Main/menu.c and .gitignore) are stored with LF. These two rules keep
+# the LF-stored files normalized to LF in the repository, so they stay
+# byte-identical to upstream and never produce whole-file diffs or merge
+# conflicts.
+#
+# "text" (without "eol") means:
+#   - the index (repository) always stores LF
+#   - the working tree keeps native line endings (CRLF on Windows, via
+#     core.eol), so nothing on disk changes
+#
+# Files that upstream stores with CRLF are deliberately left unlisted so their
+# repository content continues to match upstream exactly.
+
+Main/menu.c    text
+.gitignore     text
+
+# Keep this file itself as LF on disk.
+.gitattributes text eol=lf
