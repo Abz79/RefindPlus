@@ -2623,6 +2623,14 @@ UINTN DrawMenuScreen (
                     if (ShortcutEntry >= 0) {
                         State.CurrentSelection = ShortcutEntry;
                         MenuExit = MENU_EXIT_ENTER;
+
+                        // DA-TAG: Flag 'UserKeyScan' on Shortcut Keystrokes
+                        //         A Shortcut Keystroke is Genuine User Input
+                        //         ... Just Like an 'Enter' Keystroke
+                        //         Without This ... The Primed Buffer Mitigation
+                        //         ... Below Discards the Selection
+                        //         ... And Requires a Second Keystroke
+                        UserKeyScan = TRUE;
                     }
 
                     break;
